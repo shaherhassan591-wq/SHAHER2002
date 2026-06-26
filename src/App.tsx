@@ -20,6 +20,8 @@ import SpiritualAssistantView from "./components/SpiritualAssistantView";
 import PermissionsModal from "./components/PermissionsModal";
 import { initGlobalTapSounds } from "./utils/soundEffects";
 import { useLanguage } from "./context/LanguageContext";
+import { quranData, athkarData, hadithsList } from "./data/islamicData";
+import { quranIndex } from "./data/quranIndex";
 
 import {
   Compass,
@@ -45,6 +47,7 @@ import {
   Settings,
   MapPin,
   Image,
+  Search,
 } from "lucide-react";
 
 export default function App() {
@@ -54,12 +57,205 @@ export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<boolean>(false);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchActiveTab, setSearchActiveTab] = useState<string>("all");
+
+  const searchResults = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query.length < 2) return [];
+
+    const results: { type: "quran" | "athkar" | "hadith"; title: string; text: string; payload: any }[] = [];
+
+    // 1. Search Quran
+    if (searchActiveTab === "all" || searchActiveTab === "quran") {
+      quranData.forEach((surah) => {
+        surah.verses.forEach((verse, vIdx) => {
+          if (verse.toLowerCase().includes(query)) {
+            results.push({
+              type: "quran",
+              title: isAr ? `سورة ${surah.name} • الآية ${vIdx + 1}` : `Surah ${surah.englishName} • Ayah ${vIdx + 1}`,
+              text: verse,
+              payload: { surahNum: surah.number, verseIdx: vIdx }
+            });
+          }
+        });
+      });
+    }
+
+    // 2. Search Athkar
+    if (searchActiveTab === "all" || searchActiveTab === "athkar") {
+      athkarData.forEach((section) => {
+        section.items.forEach((item) => {
+          if (item.text.toLowerCase().includes(query) || section.title.toLowerCase().includes(query)) {
+            results.push({
+              type: "athkar",
+              title: section.title,
+              text: item.text,
+              payload: { category: section.id }
+            });
+          }
+        });
+      });
+    }
+
+    // 3. Search Hadith
+    if (searchActiveTab === "all" || searchActiveTab === "hadith") {
+      hadithsList.forEach((hadith, idx) => {
+        if (hadith.text.toLowerCase().includes(query) || hadith.narrator.toLowerCase().includes(query)) {
+          results.push({
+            type: "hadith",
+            title: isAr ? `الحديث الشريف • رقم ${idx + 1}` : `Hadith • No. ${idx + 1}`,
+            text: hadith.text,
+            payload: { hadithIdx: idx }
+          });
+        }
+      });
+    }
+
+    return results.slice(0, 30);
+  }, [searchQuery, searchActiveTab, isAr]);
+
+  const handleSearchResultClick = (res: any) => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    
+    if (res.type === "quran") {
+      localStorage.setItem("quran_selected_surah_num", res.payload.surahNum.toString());
+      localStorage.setItem("quran_select_surah_pending", "true");
+      setActiveTab("quran");
+    } else if (res.type === "athkar") {
+      localStorage.setItem("athkar_selected_category", res.payload.category);
+      localStorage.setItem("athkar_select_pending", "true");
+      setActiveTab("athkar");
+    } else if (res.type === "hadith") {
+      setActiveTab("hadiths");
+    }
+  };
+
+  // Shortcut keypress Ctrl+K or Cmd+K to trigger instant search modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
   const [accentTheme, setAccentTheme] = useState<string>(() => {
     return localStorage.getItem("app_accent_theme") || "gold";
   });
   const [showPermissions, setShowPermissions] = useState<boolean>(() => {
     return localStorage.getItem("has_seen_permissions_modal") === null;
   });
+
+  // Keep a history of navigated tabs to support seamless gesture back navigation
+  const [tabHistory, setTabHistory] = useState<string[]>(["dashboard"]);
+
+  useEffect(() => {
+    setTabHistory(prev => {
+      if (prev[prev.length - 1] === activeTab) return prev;
+      return [...prev, activeTab];
+    });
+  }, [activeTab]);
+
+  const handleGoBack = () => {
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+      return;
+    }
+    if (mobileMenuOpen) {
+      setMobileMenuOpen(false);
+      return;
+    }
+    if (isFeedbackOpen) {
+      setIsFeedbackOpen(false);
+      return;
+    }
+    if (tabHistory.length > 1) {
+      const nextHistory = [...tabHistory];
+      nextHistory.pop(); // remove current tab
+      const prevTab = nextHistory.pop(); // get previous tab
+      if (prevTab) {
+        setTabHistory(nextHistory);
+        setActiveTab(prevTab);
+      }
+    } else if (activeTab !== "dashboard") {
+      setActiveTab("dashboard");
+    }
+  };
+
+  // Listen to swiping from left or right edge of the screen (Gesture back navigation)
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let startT = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startT = Date.now();
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.changedTouches.length !== 1) return;
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const duration = Date.now() - startT;
+
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+
+      // Detect quick horizontal swipe from edge
+      if (Math.abs(diffX) > Math.abs(diffY) * 1.5 && duration < 400) {
+        const threshold = 70;
+        const edgeOffset = 45; // pixel margin from edge of screen
+
+        const isFromLeftEdge = startX < edgeOffset;
+        const isFromRightEdge = startX > window.innerWidth - edgeOffset;
+
+        if (isFromLeftEdge && diffX > threshold) {
+          handleGoBack();
+        } else if (isFromRightEdge && diffX < -threshold) {
+          handleGoBack();
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [tabHistory, activeTab, mobileMenuOpen, isFeedbackOpen, isSearchOpen]);
+
+  // Handle Capacitor native hardware back button registration
+  useEffect(() => {
+    let appBackButtonListener: any = null;
+
+    import("@capacitor/app")
+      .then(({ App }) => {
+        App.addListener("backButton", () => {
+          handleGoBack();
+        }).then(listener => {
+          appBackButtonListener = listener;
+        });
+      })
+      .catch(() => {
+        // Safe fallback if not in custom Capacitor container
+      });
+
+    return () => {
+      if (appBackButtonListener) {
+        appBackButtonListener.remove();
+      }
+    };
+  }, [tabHistory, activeTab, mobileMenuOpen, isFeedbackOpen, isSearchOpen]);
 
   useEffect(() => {
     initGlobalTapSounds();
@@ -82,6 +278,54 @@ export default function App() {
   const handleSplashComplete = () => {
     setShowSplash(false);
   };
+
+  // Swipe-to-back gestures support
+  useEffect(() => {
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchStartX) return;
+
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+
+      const diffX = touchEndX - touchStartX;
+      const diffY = touchEndY - touchStartY;
+
+      // Ensure horizontal swipe is dominant and significant
+      if (Math.abs(diffX) > 80 && Math.abs(diffY) < 40) {
+        // Swiping from edge (left-to-right or right-to-left depending on layout direction)
+        // If activeTab is not dashboard, swipe back to dashboard
+        if (activeTab !== "dashboard") {
+          setActiveTab("dashboard");
+          
+          try {
+            const synth = window.speechSynthesis;
+            if (synth && synth.speaking) {
+              synth.cancel();
+            }
+          } catch(err) {}
+        }
+      }
+
+      touchStartX = 0;
+      touchStartY = 0;
+    };
+
+    document.addEventListener("touchstart", handleTouchStart, { passive: true });
+    document.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [activeTab]);
 
   if (showSplash) {
     return <Splash onComplete={handleSplashComplete} />;
@@ -221,6 +465,17 @@ export default function App() {
         {/* Night / Light Mode visual toggle, Feedback, and Language Switcher */}
         <div className="flex items-center space-x-2 space-x-reverse">
           <button
+            onClick={() => setIsSearchOpen(true)}
+            className={`p-2 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
+              darkMode ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20" : "bg-slate-900/5 text-slate-800 hover:bg-slate-900/10"
+            }`}
+            title={isAr ? "البحث السريع (Ctrl+K)" : "Quick Search (Ctrl+K)"}
+            aria-label="Open Search"
+          >
+            <Search className="w-4.5 h-4.5" />
+          </button>
+
+          <button
             onClick={() => setIsFeedbackOpen(true)}
             className={`p-2 rounded-lg transition-all cursor-pointer ${
               darkMode ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20" : "bg-slate-900/5 text-slate-800 hover:bg-slate-900/10"
@@ -259,37 +514,39 @@ export default function App() {
         
         {/* Sidebar Nav (Desktop only) */}
         <aside
-          className={`hidden md:flex flex-col w-64 border-l p-4 space-y-2 select-none shrink-0 text-right ${
+          className={`hidden md:flex flex-col h-[calc(100vh-64px)] sticky top-16 w-64 border-l p-4 select-none shrink-0 text-right backdrop-blur-md ${
             darkMode
               ? "bg-[#071b29]/55 border-white/5"
               : "bg-amber-50/50 border-amber-900/10"
           }`}
         >
-          <div className="py-2 inline-flex items-center text-right justify-end space-x-1.5 space-x-reverse border-b border-dashed border-[#cca05a]/30 mb-2">
+          <div className="py-2 inline-flex items-center text-right justify-end space-x-1.5 space-x-reverse border-b border-dashed border-[#cca05a]/30 mb-2 shrink-0">
             <Sparkles className="w-4 h-4 text-[#cca05a] animate-pulse" />
             <span className="text-xs font-bold text-[#cca05a]">{t("islamicSections")}</span>
           </div>
 
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-end space-x-3 space-x-reverse px-4 py-3 rounded-xl text-xs font-bold transition-all text-right ${
-                  isActive
-                    ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-extrabold shadow scale-[1.03]"
-                    : darkMode
-                    ? "text-slate-300 hover:text-white hover:bg-white/5"
-                    : "text-slate-700 hover:text-slate-950 hover:bg-amber-900/5"
-                }`}
-              >
-                <span>{item.label}</span>
-                <Icon className={`w-4 h-4 ${isActive ? "text-slate-950" : "text-[#cca05a]"}`} />
-              </button>
-            );
-          })}
+          <div className="flex-1 overflow-y-auto pr-1 space-y-1.5 scrollbar-thin scrollbar-thumb-amber-500/10">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center justify-end space-x-3 space-x-reverse px-4 py-2.5 rounded-xl text-xs font-bold transition-all text-right ${
+                    isActive
+                      ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-extrabold shadow scale-[1.03]"
+                      : darkMode
+                      ? "text-slate-300 hover:text-white hover:bg-white/5"
+                      : "text-slate-700 hover:text-slate-950 hover:bg-amber-900/5"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <Icon className={`w-4 h-4 ${isActive ? "text-slate-950" : "text-[#cca05a]"}`} />
+                </button>
+              );
+            })}
+          </div>
 
           {/* User developer homage box in sidebar */}
           <div className="pt-6 mt-auto flex flex-col items-center text-center">
@@ -326,10 +583,12 @@ export default function App() {
         )}
 
         <div
-          className={`fixed top-0 bottom-0 right-0 z-[49] w-72 max-w-xs p-5 flex flex-col space-y-3 shadow-2xl transition-transform duration-300 md:hidden ${
+          className={`fixed top-0 bottom-0 right-0 z-[49] w-72 max-w-xs p-5 flex flex-col shadow-2xl transition-transform duration-300 md:hidden backdrop-blur-md border-l ${
             mobileMenuOpen ? "translate-x-0" : "translate-x-full"
           } ${
-            darkMode ? "bg-[#071b29] text-white" : "bg-amber-50 text-slate-900"
+            darkMode 
+              ? "bg-[#071b29]/85 border-white/5 text-white" 
+              : "bg-amber-50/85 border-amber-900/10 text-slate-900"
           }`}
         >
           <div className="flex justify-between items-center border-b border-dashed border-[#cca05a]/30 pb-3 mb-2 direction-rtl">
@@ -345,31 +604,34 @@ export default function App() {
             </button>
           </div>
 
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-end space-x-3 space-x-reverse px-4 py-3 rounded-xl text-xs font-bold transition text-right ${
-                  isActive
-                    ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-extrabold shadow"
-                    : darkMode
-                    ? "text-slate-300 hover:text-white hover:bg-white/5"
-                    : "text-slate-700 hover:text-slate-950 hover:bg-amber-900/5"
-                }`}
-              >
-                <span>{item.label}</span>
-                <Icon className={`w-4 h-4 ${isActive ? "text-slate-100" : "text-[#cca05a]"}`} />
-              </button>
-            );
-          })}
+          {/* Scrollable menu items area for perfect responsiveness on all screens */}
+          <div className="flex-1 overflow-y-auto my-3 pr-1 space-y-1.5 scrollbar-thin scrollbar-thumb-amber-500/10">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-end space-x-3 space-x-reverse px-4 py-2.5 rounded-xl text-xs font-bold transition text-right ${
+                    isActive
+                      ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-extrabold shadow"
+                      : darkMode
+                      ? "text-slate-300 hover:text-white hover:bg-white/5"
+                      : "text-slate-700 hover:text-slate-950 hover:bg-amber-900/5"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <Icon className={`w-4 h-4 ${isActive ? "text-slate-950" : "text-[#cca05a]"}`} />
+                </button>
+              );
+            })}
+          </div>
 
-          <div className="text-center pt-6 mt-auto border-t border-white/5 font-sans space-y-2">
+          <div className="text-center pt-3 border-t border-white/5 font-sans space-y-2 shrink-0">
             <span className="text-[10px] text-amber-500/40 block">{t("developerTitle")}</span>
             <span className="text-xs font-bold text-amber-300/80 mt-0.5 block">{t("developerName").replace("المطور / ", "")}</span>
             
@@ -407,10 +669,10 @@ export default function App() {
       {/* Embedded Global Style classes and animations inside index.css wrapper */}
       {/* Mobile Sticky Bottom Navigator Bar for seamless mobile touch UX (Touch target > 44px) */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-40 md:hidden flex justify-between items-center px-4 py-2 backdrop-blur-md border-t pb-5 transition-colors ${
+        className={`fixed bottom-0 left-0 right-0 z-40 md:hidden flex justify-between items-center px-4 py-2 backdrop-blur-lg border-t pb-5 transition-colors ${
           darkMode
-            ? "bg-[#071b29]/95 border-white/5"
-            : "bg-white/95 border-amber-900/10 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]"
+            ? "bg-[#071b29]/70 border-white/5"
+            : "bg-white/70 border-amber-900/10 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]"
         }`}
       >
         {menuItems.slice(0, 6).map((item) => {
@@ -448,6 +710,269 @@ export default function App() {
         onClose={() => setIsFeedbackOpen(false)}
         darkMode={darkMode}
       />
+
+      {/* 🔍 Dynamic Global Search Drawer Modal Overlay */}
+      {isSearchOpen && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 md:p-10 select-none">
+          {/* Blur background glass backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity"
+            onClick={() => {
+              setIsSearchOpen(false);
+              setSearchQuery("");
+            }}
+          />
+
+          {/* Modal Container */}
+          <div className={`relative w-full max-w-2xl rounded-2xl border shadow-2xl flex flex-col overflow-hidden max-h-[85vh] md:max-h-[75vh] animate-in fade-in zoom-in duration-200 ${
+            darkMode 
+              ? "bg-[#071b29] border-[#cca05a]/30 text-white" 
+              : "bg-amber-50 border-amber-900/20 text-slate-900"
+          }`} style={{ direction: isAr ? "rtl" : "ltr" }}>
+            
+            {/* Header Input Area */}
+            <div className="flex items-center gap-3 p-4 border-b border-dashed border-slate-500/10 shrink-0">
+              <Search className="w-5 h-5 text-[#cca05a] shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                placeholder={isAr ? "ابحث عن سور، أذكار، أدعية أو أي قسم..." : "Search Surahs, Athkar, or any section..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-sm font-medium py-1 placeholder-slate-400"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="p-1 rounded-full hover:bg-white/5 text-slate-400 hover:text-white text-[10px]"
+                >
+                  ✕
+                </button>
+              )}
+              <span className="text-[10px] font-mono text-[#cca05a]/60 bg-[#cca05a]/5 px-2 py-0.5 rounded border border-[#cca05a]/10 hidden sm:inline">
+                ESC
+              </span>
+            </div>
+
+            {/* Scrollable Results Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+              {(() => {
+                const query = searchQuery.trim().toLowerCase();
+                
+                // 1. Filter Navigation/Tabs
+                const matchingTabs = menuItems.filter(item => 
+                  item.label.toLowerCase().includes(query) || 
+                  (isAr && item.label.includes(query))
+                );
+
+                // 2. Filter Quran Surahs
+                const matchingSurahs = query 
+                  ? quranIndex.filter(s => 
+                      s.name.includes(query) || 
+                      s.englishName.toLowerCase().includes(query) ||
+                      String(s.number) === query
+                    )
+                  : [];
+
+                // 3. Filter Athkar Sections
+                const matchingAthkar = query
+                  ? athkarData.filter(cat => 
+                      cat.title.includes(query) || 
+                      cat.items.some(item => item.text.includes(query))
+                    )
+                  : [];
+
+                const hasResults = matchingTabs.length > 0 || matchingSurahs.length > 0 || matchingAthkar.length > 0;
+
+                if (!query) {
+                  // Quick Access/Most Searched suggestions
+                  return (
+                    <div className="space-y-4 text-right">
+                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                        {isAr ? "وصول سريع ورائج 🔥" : "Popular & Quick Access 🔥"}
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {[
+                          { id: "quran", labelAr: "القرآن الكريم", labelEn: "Holy Quran" },
+                          { id: "athkar", labelAr: "حصن المسلم", labelEn: "Athkar & Duas" },
+                          { id: "tasbih", labelAr: "المسبحة الإلكترونية", labelEn: "Tasbih Counter" },
+                          { id: "dailyward", labelAr: "الورد اليومي", labelEn: "Daily Progress" },
+                          { id: "adhan", labelAr: "أصوات الأذان", labelEn: "Adhan Sounds" },
+                          { id: "ai_assistant", labelAr: "المساعد الإسلامي AI", labelEn: "AI Spiritual Assistant" },
+                        ].map(sug => (
+                          <button
+                            key={sug.id}
+                            onClick={() => {
+                              setActiveTab(sug.id);
+                              setIsSearchOpen(false);
+                            }}
+                            className={`p-3 rounded-xl border text-center transition hover:scale-[1.02] active:scale-95 cursor-pointer ${
+                              darkMode
+                                ? "bg-slate-900/50 border-white/5 hover:bg-slate-900 hover:border-[#cca05a]/30"
+                                : "bg-white border-amber-900/10 hover:bg-amber-100/50"
+                            }`}
+                          >
+                            <span className="text-xs font-bold block mb-0.5 text-[#cca05a]">
+                              {isAr ? sug.labelAr : sug.labelEn}
+                            </span>
+                            <span className="text-[9px] text-slate-400">
+                              {isAr ? "انتقال سريع" : "Go to section"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (!hasResults) {
+                  return (
+                    <div className="py-8 text-center space-y-2">
+                      <span className="text-3xl">🔍</span>
+                      <p className="text-xs font-bold text-slate-400">
+                        {isAr ? "لم نجد أي نتائج تطابق بحثك." : "No results match your search."}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {isAr ? "تأكد من كتابة الكلمات بشكل صحيح وجرب مجدداً." : "Check your spelling and try again."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4 text-right">
+                    
+                    {/* Sections Results */}
+                    {matchingTabs.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-wider pb-1 border-b border-dashed border-slate-500/15">
+                          {isAr ? "أقسام وصفحات التطبيق" : "App Sections & Pages"}
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {matchingTabs.map(item => {
+                            const Icon = item.icon;
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  setActiveTab(item.id);
+                                  setIsSearchOpen(false);
+                                  setSearchQuery("");
+                                }}
+                                className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-right transition hover:scale-[1.01] cursor-pointer ${
+                                  darkMode
+                                    ? "bg-slate-900/40 border-white/5 hover:border-[#cca05a]/30 hover:bg-slate-900"
+                                    : "bg-white border-amber-900/10 hover:bg-amber-100/50"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Icon className="w-4 h-4 text-[#cca05a]" />
+                                  <span className="text-xs font-bold">
+                                    {item.label}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] text-slate-500">
+                                  {isAr ? "دخول" : "Enter"}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quran Surahs Results */}
+                    {matchingSurahs.length > 0 && (
+                      <div className="space-y-1.5">
+                        <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-wider pb-1 border-b border-dashed border-slate-500/15">
+                          {isAr ? "سور القرآن الكريم" : "Holy Quran Surahs"}
+                        </h4>
+                        <div className="space-y-1">
+                          {matchingSurahs.map(s => (
+                            <button
+                              key={s.number}
+                              onClick={() => {
+                                localStorage.setItem("quran_selected_surah_num", String(s.number));
+                                localStorage.setItem("quran_select_surah_pending", "true");
+                                setActiveTab("quran");
+                                setIsSearchOpen(false);
+                                setSearchQuery("");
+                              }}
+                              className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-right transition cursor-pointer ${
+                                darkMode
+                                  ? "bg-slate-900/40 border-white/5 hover:border-[#cca05a]/30 hover:bg-slate-900"
+                                  : "bg-white border-amber-900/10 hover:bg-amber-100/50"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono text-[#cca05a] bg-[#cca05a]/10 w-6 h-6 rounded-lg flex items-center justify-center font-bold">
+                                  {s.number}
+                                </span>
+                                <div className="text-right">
+                                  <span className="text-xs font-bold block">
+                                    سورة {s.name}
+                                  </span>
+                                  <span className="text-[9px] text-slate-500 font-sans">
+                                    {s.englishName} • {s.numberOfAyahs} {isAr ? "آية" : "verses"}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold text-[#cca05a]">
+                                {s.revelationType === "Meccan" ? (isAr ? "مكية" : "Meccan") : (isAr ? "مدنية" : "Medinan")}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Athkar Results */}
+                    {matchingAthkar.length > 0 && (
+                      <div className="space-y-1.5">
+                        <h4 className="text-[10px] font-bold text-amber-500 uppercase tracking-wider pb-1 border-b border-dashed border-slate-500/15">
+                          {isAr ? "أقسام حصن المسلم والأذكار" : "Hisn Al-Muslim Athkar"}
+                        </h4>
+                        <div className="space-y-1">
+                          {matchingAthkar.map(cat => (
+                            <button
+                              key={cat.id}
+                              onClick={() => {
+                                localStorage.setItem("athkar_selected_category", cat.id);
+                                localStorage.setItem("athkar_select_pending", "true");
+                                setActiveTab("athkar");
+                                setIsSearchOpen(false);
+                                setSearchQuery("");
+                              }}
+                              className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-right transition cursor-pointer ${
+                                darkMode
+                                  ? "bg-slate-900/40 border-white/5 hover:border-[#cca05a]/30 hover:bg-slate-900"
+                                  : "bg-white border-amber-900/10 hover:bg-amber-100/50"
+                              }`}
+                            >
+                              <div className="text-right">
+                                <span className="text-xs font-bold block text-amber-300">
+                                  {cat.title}
+                                </span>
+                                <span className="text-[9px] text-slate-500 block truncate max-w-md">
+                                  {cat.items[0]?.text || ""}
+                                </span>
+                              </div>
+                              <span className="text-[9px] bg-amber-500/10 text-[#cca05a] px-2 py-0.5 rounded-full border border-[#cca05a]/20 font-bold">
+                                {isAr ? "عرض الذكر" : "View"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

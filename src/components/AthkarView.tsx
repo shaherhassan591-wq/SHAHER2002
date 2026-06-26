@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, RotateCcw, AlertCircle, Bookmark, Share2, Sparkles, BookOpen } from "lucide-react";
 import { athkarData } from "../data/islamicData";
@@ -12,6 +12,22 @@ export default function AthkarView() {
   );
   const audioContextRef = useRef<AudioContext | null>(null);
   const [sharedId, setSharedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkPendingCategory = () => {
+      const pending = localStorage.getItem("athkar_select_pending");
+      if (pending === "true") {
+        localStorage.removeItem("athkar_select_pending");
+        const cat = localStorage.getItem("athkar_selected_category");
+        if (cat) {
+          setActiveCategory(cat);
+        }
+      }
+    };
+    checkPendingCategory();
+    const interval = setInterval(checkPendingCategory, 350);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleShareZikr = async (item: Zikr, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent incrementing count when sharing

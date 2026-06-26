@@ -477,6 +477,28 @@ export default function QuranView({ darkMode = true }: { darkMode?: boolean }) {
     };
   }, []);
 
+  // Handle dynamic external selected surah requests (e.g. from global search)
+  useEffect(() => {
+    const checkPendingSurah = () => {
+      const pending = localStorage.getItem("quran_select_surah_pending");
+      if (pending === "true") {
+        localStorage.removeItem("quran_select_surah_pending");
+        const sNumStr = localStorage.getItem("quran_selected_surah_num");
+        if (sNumStr) {
+          const sNum = Number(sNumStr);
+          const meta = quranIndex.find((s) => s.number === sNum);
+          if (meta) {
+            setSelectedSurahMeta(meta);
+            setMushafPage(0); // reset page to start
+          }
+        }
+      }
+    };
+    checkPendingSurah();
+    const interval = setInterval(checkPendingSurah, 350);
+    return () => clearInterval(interval);
+  }, []);
+
   // Handle auto-jumping to saved bookmark on mount if redirected from Dashboard
   useEffect(() => {
     if (localStorage.getItem("quran_jump_to_bookmark_pending") === "true") {

@@ -62,3 +62,30 @@ export async function deleteCustomAudio(): Promise<void> {
     request.onerror = () => reject(request.error);
   });
 }
+
+export async function saveAudioByKey(key: string, blob: Blob): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(blob, key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getAudioByKey(key: string): Promise<Blob | null> {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error(`Failed to read key ${key} from IndexedDB:`, e);
+    return null;
+  }
+}

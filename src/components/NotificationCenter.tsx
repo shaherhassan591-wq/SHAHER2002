@@ -1259,9 +1259,24 @@ export default function NotificationCenter() {
                   return;
                 }
                 const mp3 = "https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3"; // default / real_prophet
-                const audioObj = new Audio(mp3);
-                audioObj.volume = 0.8;
-                audioObj.play().catch(() => {});
+                import("../utils/audioStorage").then(({ getAudioByKey }) => {
+                  getAudioByKey("real_prophet").then(blob => {
+                    if (blob) {
+                      const objectUrl = URL.createObjectURL(blob);
+                      const audioObj = new Audio(objectUrl);
+                      audioObj.volume = 0.8;
+                      audioObj.play().catch(() => {});
+                    } else {
+                      const audioObj = new Audio(mp3);
+                      audioObj.volume = 0.8;
+                      audioObj.play().catch(() => {});
+                    }
+                  }).catch(() => {
+                    const audioObj = new Audio(mp3);
+                    audioObj.volume = 0.8;
+                    audioObj.play().catch(() => {});
+                  });
+                });
                 triggerLocalAlert("💚 تجربة تذكير النبي", "اللهم صلّ وسلم وبارك على نبينا محمد وعلى آله وصحبه أجمعين.", "salat");
               }}
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] py-2 rounded-lg transition active:scale-95 cursor-pointer shadow-md"

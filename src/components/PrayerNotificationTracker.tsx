@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Bell, Volume2, X, Play, Pause, Square } from "lucide-react";
 import { isNativeAndroid } from "../utils/androidBridge";
 import { scheduleAllOfflineNotifications } from "../utils/localNotifications";
+import { getAudioByKey } from "../utils/audioStorage";
 
 interface CustomSound {
   id: string;
@@ -221,7 +222,36 @@ export default function PrayerNotificationTracker() {
       };
     };
 
-    playWithFallback();
+    // Try playing from IndexedDB cached files first to allow 100% offline playback
+    const cacheKey = `adhan_${voiceId}`;
+    getAudioByKey(cacheKey)
+      .then((blob) => {
+        if (blob) {
+          const localUrl = URL.createObjectURL(blob);
+          console.log(`[PrayerNotificationTracker] Playing offline cached Adhan for ${voiceId}!`);
+          const audio = new Audio(localUrl);
+          audioRef.current = audio;
+          audio.volume = 0.9;
+          audio.play()
+            .then(() => {
+              setIsPlayingAdhan(true);
+            })
+            .catch((err) => {
+              console.error("[PrayerNotificationTracker] Failed playing cached blob, falling back to network.", err);
+              playWithFallback();
+            });
+          audio.onended = () => {
+            setIsPlayingAdhan(false);
+          };
+        } else {
+          console.log(`[PrayerNotificationTracker] No offline cache found for ${voiceId}, falling back to network URLs.`);
+          playWithFallback();
+        }
+      })
+      .catch((err) => {
+        console.error("[PrayerNotificationTracker] IndexedDB read error, falling back to network URLs.", err);
+        playWithFallback();
+      });
   };
 
   const triggerSystemNotification = (title: string, body: string) => {

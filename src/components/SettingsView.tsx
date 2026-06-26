@@ -23,6 +23,7 @@ import {
   Info
 } from "lucide-react";
 import { muadhinsList } from "../data/islamicData";
+import { saveAudioByKey, getAudioByKey } from "../utils/audioStorage";
 import {
   CITIES,
   METHODS,
@@ -38,6 +39,99 @@ interface SettingsViewProps {
 
 export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProps) {
   const { language, t, isAr, dir, toggleLanguage } = useLanguage();
+
+  // Offline Resources States
+  const [prophetCached, setProphetCached] = useState<boolean>(false);
+  const [downloadingProphet, setDownloadingProphet] = useState<boolean>(false);
+  const [prophetStatusMsg, setProphetStatusMsg] = useState<string | null>(null);
+
+  const [adhanCachedCount, setAdhanCachedCount] = useState<number>(0);
+  const [downloadingAdhans, setDownloadingAdhans] = useState<boolean>(false);
+  const [adhanProgress, setAdhanProgress] = useState<number>(0);
+  const [adhanStatusMsg, setAdhanStatusMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if Prophet audio is cached
+    getAudioByKey("real_prophet").then((blob) => {
+      setProphetCached(blob !== null);
+    }).catch(() => setProphetCached(false));
+
+    // Check how many Adhans are cached
+    let count = 0;
+    const checks = muadhinsList.map(async (m) => {
+      try {
+        const blob = await getAudioByKey(`adhan_${m.id}`);
+        if (blob) count++;
+      } catch (e) {}
+    });
+    Promise.all(checks).then(() => {
+      setAdhanCachedCount(count);
+    });
+  }, []);
+
+  const handleDownloadProphetVoice = async () => {
+    setDownloadingProphet(true);
+    setProphetStatusMsg(isAr ? "جاري تحميل وتخزين صوت الصلاة على النبي أوفلاين..." : "Downloading Prophet audio offline...");
+    try {
+      const url = "https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3";
+      const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
+      let blob: Blob;
+      try {
+        const res = await fetch(proxiedUrl);
+        if (!res.ok) throw new Error("CORS proxy error");
+        blob = await res.blob();
+      } catch (err) {
+        const res = await fetch(url);
+        blob = await res.blob();
+      }
+      await saveAudioByKey("real_prophet", blob);
+      setProphetCached(true);
+      setProphetStatusMsg(isAr ? "تم التحميل والحفظ بنجاح! يعمل الصوت الآن بالكامل بدون إنترنت 🟢" : "Saved successfully! Audio works fully offline now 🟢");
+    } catch (e) {
+      console.error(e);
+      setProphetStatusMsg(isAr ? "حدث خطأ أثناء تحميل الملف. تحقق من اتصال الشبكة." : "Error downloading. Check network connection.");
+    } finally {
+      setDownloadingProphet(false);
+    }
+  };
+
+  const handleDownloadAllAdhans = async () => {
+    setDownloadingAdhans(true);
+    setAdhanProgress(0);
+    setAdhanStatusMsg(isAr ? "بدء تحميل ملفات الأذان أوفلاين..." : "Starting Adhan downloads...");
+    
+    let downloadedCount = 0;
+    for (let i = 0; i < muadhinsList.length; i++) {
+      const muadhin = muadhinsList[i];
+      setAdhanStatusMsg(isAr ? `جاري تحميل أذان ${muadhin.name}...` : `Downloading ${muadhin.name}...`);
+      try {
+        const url = muadhin.audioUrl;
+        const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(url)}`;
+        let blob: Blob;
+        try {
+          const res = await fetch(proxiedUrl);
+          if (!res.ok) throw new Error("Proxy error");
+          blob = await res.blob();
+        } catch (err) {
+          const res = await fetch(url);
+          blob = await res.blob();
+        }
+        await saveAudioByKey(`adhan_${muadhin.id}`, blob);
+        downloadedCount++;
+        setAdhanProgress(Math.round(((i + 1) / muadhinsList.length) * 100));
+      } catch (e) {
+        console.error(`Failed to download Adhan for ${muadhin.id}`, e);
+      }
+    }
+    
+    setAdhanCachedCount(downloadedCount);
+    setAdhanStatusMsg(
+      isAr 
+        ? `اكتمل التحميل! تم حفظ ${downloadedCount} من أصل ${muadhinsList.length} مؤذنين للعمل بدون اتصال بالكامل 🟢` 
+        : `Complete! Cached ${downloadedCount} of ${muadhinsList.length} Adhans offline 🟢`
+    );
+    setDownloadingAdhans(false);
+  };
 
   // Color Theme State
   const [accentTheme, setAccentTheme] = useState<string>(() => {
@@ -1125,6 +1219,106 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
             >
               English
             </button>
+          </div>
+        </div>
+
+        {/* 📥 OFFLINE RESOURCES MANAGER CARD */}
+        <div className={`rounded-2xl border p-5 shadow-lg space-y-4 ${
+          darkMode ? "bg-[#071b29] border-white/5" : "bg-white border-amber-900/10"
+        }`}>
+          <div className="flex items-center space-x-2 space-x-reverse justify-end pb-3 border-b border-white/5">
+            <span className="text-xs font-bold text-amber-400">
+              {isAr ? "موارد التطبيق للعمل بدون إنترنت" : "App Resources for Offline Work"}
+            </span>
+            <DownloadCloud className="w-4 h-4 text-amber-500 shrink-0" />
+          </div>
+          <p className="text-[11px] text-slate-400 font-light leading-relaxed text-right">
+            {isAr 
+              ? "قم بتحميل وحفظ المقاطع الصوتية مباشرة إلى الذاكرة الدائمة لهاتفك لتشغيل الأذان وتنبيهات الأذكار والصلاة على النبي بالكامل حتى أثناء انقطاع اتصالك بالإنترنت."
+              : "Download and save audio files directly to your persistent offline memory. This guarantees fully functioning Adhan and Athkar voice alerts even in offline or airplane mode."}
+          </p>
+
+          <div className="space-y-3 pt-2">
+            {/* Prophet blessing section */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 rounded-xl bg-slate-950/25 border border-white/5 gap-2 text-right">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-amber-200">
+                  {isAr ? "صوت التذكير بالصلاة على النبي الشريف" : "Prophet Sallou Alayh Audio"}
+                </span>
+                <span className="text-[10px] text-slate-400 mt-0.5">
+                  {prophetCached 
+                    ? (isAr ? "🟢 جاهز ومحفوظ بالكامل أوفلاين" : "🟢 Fully cached offline")
+                    : (isAr ? "🔴 غير محفوظ (سيتم البث أونلاين فقط)" : "🔴 Not cached (will stream online)")}
+                </span>
+                {prophetStatusMsg && (
+                  <span className="text-[10px] text-amber-400 mt-1 font-bold">
+                    {prophetStatusMsg}
+                  </span>
+                )}
+              </div>
+              <button
+                disabled={downloadingProphet}
+                onClick={handleDownloadProphetVoice}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                  prophetCached 
+                    ? "bg-slate-800 text-[#cca05a] border border-[#cca05a]/30 hover:bg-slate-900" 
+                    : "bg-[#cca05a] text-slate-950 hover:bg-amber-400"
+                }`}
+              >
+                {downloadingProphet ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <DownloadCloud className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {prophetCached 
+                    ? (isAr ? "تحديث التحميل" : "Update Cache") 
+                    : (isAr ? "تحميل للعمل أوفلاين" : "Download Offline")}
+                </span>
+              </button>
+            </div>
+
+            {/* Adhan section */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 rounded-xl bg-slate-950/25 border border-white/5 gap-2 text-right">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-amber-200">
+                  {isAr ? "ملفات الأذان الكاملة لجميع المؤذنين" : "All Muadhins Full Adhan MP3s"}
+                </span>
+                <span className="text-[10px] text-slate-400 mt-0.5">
+                  {isAr 
+                    ? `🟢 تم حفظ ${adhanCachedCount} من أصل ${muadhinsList.length} أذان كامل`
+                    : `🟢 Cached ${adhanCachedCount} of ${muadhinsList.length} Adhan files`}
+                </span>
+                {adhanStatusMsg && (
+                  <span className="text-[10px] text-amber-400 mt-1 font-bold">
+                    {adhanStatusMsg}
+                  </span>
+                )}
+              </div>
+              <button
+                disabled={downloadingAdhans}
+                onClick={handleDownloadAllAdhans}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+                  adhanCachedCount === muadhinsList.length 
+                    ? "bg-slate-800 text-[#cca05a] border border-[#cca05a]/30 hover:bg-slate-900" 
+                    : "bg-[#cca05a] text-slate-950 hover:bg-amber-400"
+                }`}
+              >
+                {downloadingAdhans ? (
+                  <div className="flex items-center gap-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{adhanProgress}%</span>
+                  </div>
+                ) : (
+                  <DownloadCloud className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {adhanCachedCount === muadhinsList.length 
+                    ? (isAr ? "إعادة تحميل الكل" : "Re-download All") 
+                    : (isAr ? "تحميل كافة الأذانات" : "Download All Adhans")}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 

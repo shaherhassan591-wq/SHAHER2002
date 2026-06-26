@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, Info, Star, Heading, Sparkles, AlertTriangle, Disc, Sunrise, Sun, CloudSun, Sunset, Moon, Upload, Trash2 } from "lucide-react";
 import { muadhinsList } from "../data/islamicData";
 import { Muadhin, NotificationSetting } from "../types";
+import { getAudioByKey } from "../utils/audioStorage";
 import { isNativeAndroid, playNativeEmbeddedAudio, stopNativeEmbeddedAudio } from "../utils/androidBridge";
 
 export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean }) {
@@ -106,8 +107,32 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
     return expanded;
   };
 
+  const [cachedBlobUrl, setCachedBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getAudioByKey(`adhan_${activeMuadhin.id}`).then((blob) => {
+      if (active && blob) {
+        const url = URL.createObjectURL(blob);
+        setCachedBlobUrl(url);
+      } else if (active) {
+        setCachedBlobUrl(null);
+      }
+    }).catch(() => {
+      if (active) setCachedBlobUrl(null);
+    });
+
+    return () => {
+      active = false;
+      if (cachedBlobUrl) {
+        URL.revokeObjectURL(cachedBlobUrl);
+      }
+    };
+  }, [activeMuadhin.id]);
+
   const adhanUrls = getAdhanUrls(activeMuadhin.id);
-  const currentAudioUrl = adhanUrls[currentUrlIndex] || activeMuadhin.audioUrl;
+  const finalUrls = cachedBlobUrl ? [cachedBlobUrl, ...adhanUrls] : adhanUrls;
+  const currentAudioUrl = finalUrls[currentUrlIndex] || activeMuadhin.audioUrl;
 
   useEffect(() => {
     // Reset indices when switching active Muadhin

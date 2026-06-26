@@ -73,6 +73,22 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
     // 2. Request / Ensure permission
     await requestLocalNotificationPermissions();
 
+    // Create high-importance channel for Android popup/heads-up notifications
+    try {
+      await LocalNotifications.createChannel({
+        id: "prayer-times-channel",
+        name: "أوقات الصلاة والتنبيهات والآذان",
+        description: "تنبيهات مواعيد الصلوات الخمس والأذكار والآيات الشريفة بحد أقصى للأولوية لظهورها كإشعار منبثق على شاشة الهاتف.",
+        importance: 5, // MAX importance (Heads-up / Pop-up notification!)
+        visibility: 1,  // PUBLIC
+        vibration: true,
+        lights: true,
+      });
+      console.log("[LocalNotifications] Successfully created/verified high importance channel: prayer-times-channel");
+    } catch (chanErr) {
+      console.warn("[LocalNotifications] Error creating notification channel:", chanErr);
+    }
+
     // 3. Prepare notifications list
     const notificationsToSchedule: any[] = [];
     let idCounter = 1000; // unique notification index counter
@@ -138,12 +154,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
           body: isSilent 
             ? `أقيمت صلاة ${s.prayerName.replace("صلاة ", "")}، تذكر أداء الفريضة في وقتها (وضع صامت).`
             : `الله أكبر، الله أكبر.. نداء الحق لـ صلاة ${s.prayerName.replace("صلاة ", "")} بتوقيتك المحلي. أقم صلاتك تسعد حياتك.`,
+          channelId: "prayer-times-channel", // Map to high-importance channel
           schedule: {
             on: { hour, minute },
             repeats: true,
             allowWhileIdle: true
           },
-          sound: isSilent ? undefined : "adhan.wav",
+          sound: isSilent ? undefined : undefined, // fallback to default system notification chime/adhan beep
           actionTypeId: "PRAYER_ACTION",
           extra: {
             prayerId: s.prayerId
@@ -161,6 +178,7 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
             id: idCounter++,
             title: `⏳ اقترب موعد صلاة ${s.prayerName.replace("صلاة ", "")}`,
             body: `بقي أقل من ${toArabicNumerals(prepTime)} دقائق للنداء المبارك لصلاة ${s.prayerName.replace("صلاة ", "")}. استعد وتوضأ لملاقاة الرحمن.`,
+            channelId: "prayer-times-channel", // Map to high-importance channel
             schedule: {
               on: {
                 hour: alertHour,
@@ -169,7 +187,7 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
               repeats: true,
               allowWhileIdle: true
             },
-            sound: isSilent ? undefined : "chime.wav",
+            sound: isSilent ? undefined : undefined,
             actionTypeId: "PRE_PRAYER_ACTION"
           });
         }
@@ -201,12 +219,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
           id: idCounter++,
           title: "📿 حان الآن وقت أذكار الصباح",
           body: "أصبحنا وأصبح الملك لله.. رطب لسانك بذكر الله وحصّن يومك المبارك بالأذكار كاملة الآن.",
+          channelId: "prayer-times-channel",
           schedule: {
             on: { hour: h, minute: m },
             repeats: true,
             allowWhileIdle: true
           },
-          sound: "chime.wav"
+          sound: undefined
         });
       }
 
@@ -216,12 +235,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
           id: idCounter++,
           title: "📿 حان الآن وقت أذكار المساء",
           body: "أمسينا وأمسي الملك لله.. اختتم نهارك بالبركة وحصّن نفسك ودارك بأذكار المساء المباركة.",
+          channelId: "prayer-times-channel",
           schedule: {
             on: { hour: h, minute: m },
             repeats: true,
             allowWhileIdle: true
           },
-          sound: "chime.wav"
+          sound: undefined
         });
       }
 
@@ -231,12 +251,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
           id: idCounter++,
           title: "🌌 تذكير قبيل النوم بالأذكار",
           body: "باسمك ربي وضعت جنبي وبك أرفعه.. لا تنسَ أذكار النوم وورد سورة الملك طلباً للسكينة والحفظ.",
+          channelId: "prayer-times-channel",
           schedule: {
             on: { hour: h, minute: m },
             repeats: true,
             allowWhileIdle: true
           },
-          sound: "chime.wav"
+          sound: undefined
         });
       }
     }
@@ -268,7 +289,7 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
 
     const DAILY_MORAL_TIPS = [
       "بر الوالدين مفتاح لكل توفيق؛ اتصل بوالديك اليوم وأسعدهما بكلمة طيبة تسعد قلبيهما.",
-      "إماطة الأذى عن الطريق صدقة، حافظ على نظافة بيئتك واجعل ممر الناس آمناً مريحاً.",
+      "إماطة الأذى عن الطريق صدقة, حافظ على نظافة بيئتك واجعل ممر الناس آمناً مريحاً.",
       "الكلمة الطيبة تفتح مغاليق القلوب؛ قل خيراً يرفع من شأن الناس أو اصمت فذلك أزكى لك.",
       "العفو والصفح عند المقدرة من شيم الكرام؛ اعفُ عمن أخطأ بحقك ليرتاح صدرك ويصفو عيشك الحبيب.",
       "الأمانة خلق رفيع؛ كن أميناً مخلصاً في عملك ووفِ بوعودك فالمؤمن إذا عاهد وفى بعهده.",
@@ -284,12 +305,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
         id: idCounter++,
         title: "📖 آية اليوم المتدبرة",
         body: `قال الله تعالى: "${verse.text}" [${verse.ref}]`,
+        channelId: "prayer-times-channel",
         schedule: {
           on: { hour: 9, minute: 0 },
           repeats: true,
           allowWhileIdle: true
         },
-        sound: "chime.wav"
+        sound: undefined
       });
     }
 
@@ -299,12 +321,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
         id: idCounter++,
         title: "💬 الحديث النبوي الشريف لليوم",
         body: `عن النبي ﷺ قال: "${hadith.text}" [${hadith.ref}]`,
+        channelId: "prayer-times-channel",
         schedule: {
           on: { hour: 13, minute: 0 },
           repeats: true,
           allowWhileIdle: true
         },
-        sound: "chime.wav"
+        sound: undefined
       });
     }
 
@@ -314,12 +337,13 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
         id: idCounter++,
         title: "💡 نصيحة أخلاقية قيّمة لليوم",
         body: tip,
+        channelId: "prayer-times-channel",
         schedule: {
           on: { hour: 17, minute: 0 },
           repeats: true,
           allowWhileIdle: true
         },
-        sound: "chime.wav"
+        sound: undefined
       });
     }
 

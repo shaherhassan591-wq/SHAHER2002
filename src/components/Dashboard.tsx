@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../context/LanguageContext";
-import { getCustomAudio, saveCustomAudio, hasCustomAudio, deleteCustomAudio } from "../utils/audioStorage";
+import { getCustomAudio, saveCustomAudio, hasCustomAudio, deleteCustomAudio, getAudioByKey } from "../utils/audioStorage";
 import {
   AreaChart,
   Area,
@@ -665,6 +665,47 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
         }).catch(err => {
           console.error("Error reading custom audio:", err);
           playSyntheticSalawat();
+        });
+        return;
+      }
+
+      if (voiceInfo.id === "real_prophet") {
+        getAudioByKey("real_prophet").then(blob => {
+          if (blob) {
+            const objectUrl = URL.createObjectURL(blob);
+            const audio = new Audio(objectUrl);
+            salawatAudioRef.current = audio;
+            audio.play().then(() => {
+              console.log("[Dashboard] Played cached real_prophet audio successfully.");
+            }).catch(err => {
+              console.warn("Failed to play cached real_prophet, fallback to synthetic", err);
+              playSyntheticSalawat();
+            });
+          } else {
+            // Not cached, stream normally
+            const fullUrl = voiceInfo.url;
+            const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}`;
+            const audio = new Audio(proxiedUrl);
+            salawatAudioRef.current = audio;
+            audio.preload = "auto";
+            audio.play().catch(() => {
+              const directAudio = new Audio(fullUrl);
+              salawatAudioRef.current = directAudio;
+              directAudio.play().catch(() => playSyntheticSalawat());
+            });
+          }
+        }).catch(() => {
+          // Fallback stream normally
+          const fullUrl = voiceInfo.url;
+          const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}`;
+          const audio = new Audio(proxiedUrl);
+          salawatAudioRef.current = audio;
+          audio.preload = "auto";
+          audio.play().catch(() => {
+            const directAudio = new Audio(fullUrl);
+            salawatAudioRef.current = directAudio;
+            directAudio.play().catch(() => playSyntheticSalawat());
+          });
         });
         return;
       }
@@ -1684,132 +1725,6 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
             </button>
           </div>
         )}
-      </div>
-
-      {/* 🎨 APP ICON PROPOSALS & CUSTOMIZER WIDGET */}
-      <div
-        className={`relative overflow-hidden rounded-2xl border p-4 shadow-md transition-all duration-300 ${
-          darkMode
-            ? "bg-gradient-to-b from-[#091b29] to-[#04121e] border-[#cca05a]/30 text-white"
-            : "bg-white border-amber-900/10 text-slate-950"
-        }`}
-        style={{ direction: dir }}
-      >
-        <div className="absolute left-4 top-2 opacity-5 text-4xl">🎨</div>
-
-        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#cca05a]/20 mb-3">
-          <div className="flex items-center gap-1.5 text-[#cca05a]">
-            <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-            <h3 className="text-xs font-extrabold font-sans">
-              {isAr ? "خيارات أيقونة التطبيق (تصاميم الذكاء الاصطناعي)" : "Preferred App Icon (AI Proposals)"}
-            </h3>
-          </div>
-          <span className="text-[9px] bg-amber-500/10 text-[#cca05a] border border-[#cca05a]/25 px-2.5 py-0.5 rounded-full font-bold">
-            {isAr ? "تغيير سريع وحفظ" : "Select and Save"}
-          </span>
-        </div>
-
-        {/* Compact Icons Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            {
-              id: "emerald",
-              nameAr: "الزمردي الذهبي الفاخر",
-              nameEn: "Golden Emerald Star",
-              descAr: "نقوش مذهبة بالخط العربي المتقن لمصحف شريف، مع نجمة ثمانية إسلامية أصيلة (ربع الحزب) على خلفية زمردية.",
-              descEn: "Intricate golden outlines of the Holy Quran inside a traditional Rub el Hizb star, on a premium emerald canvas.",
-              img: emeraldIcon,
-              tagAr: "الوقار والهيبة",
-              tagEn: "Imperial & Classic"
-            },
-            {
-              id: "indigo",
-              nameAr: "الهلال السماوي الخاشع",
-              nameEn: "Celestial Indigo Moon",
-              descAr: "هلال ذهبي دافئ يحتضن المصحف الشريف في سكون تام، مع إضاءات سماوية ناعمة وغبار ذهبي متلألئ.",
-              descEn: "A glowing golden crescent moon cradling the Quran with soft celestial light and shimmering stardust.",
-              img: indigoIcon,
-              tagAr: "السكينة والهدوء",
-              tagEn: "Serenity & Peace"
-            },
-            {
-              id: "amber",
-              nameAr: "البرونزي المعماري العتيق",
-              nameEn: "Antique Bronze Dome",
-              descAr: "رؤية فنية تجريدية لظل قبة المسجد الممتزجة بانحناءات ورقات المصحف الذهبية، بلمسات برونزية عتيقة.",
-              descEn: "An artistic fusion of mosque dome silhouettes and flowing golden book pages, in deep bronze gradients.",
-              img: amberIcon,
-              tagAr: "الأصالة والتراث",
-              tagEn: "Artistic & Heritage"
-            }
-          ].map((item) => {
-            const isSelected = selectedAppIcon === item.id;
-            return (
-              <div
-                key={item.id}
-                onClick={() => handleSelectIcon(item.id)}
-                className={`group relative flex items-center gap-3 rounded-xl border p-2.5 transition-all duration-300 cursor-pointer overflow-hidden ${
-                  isSelected
-                    ? "border-amber-500 bg-[#cca05a]/10 ring-1 ring-amber-500/20 shadow-sm"
-                    : darkMode
-                      ? "border-white/5 bg-slate-950/40 hover:border-[#cca05a]/30 hover:bg-slate-900/30"
-                      : "border-slate-100 bg-slate-50/50 hover:border-amber-900/10 hover:bg-slate-50"
-                }`}
-              >
-                {/* Image Thumbnail Container */}
-                <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 shadow-sm border border-white/5">
-                  <img
-                    src={item.img}
-                    alt={isAr ? item.nameAr : item.nameEn}
-                    className="w-full h-full object-cover select-none pointer-events-none"
-                    referrerPolicy="no-referrer"
-                  />
-                  
-                  {/* Zoom Overlay on hover */}
-                  <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLightboxImage({
-                          src: item.img,
-                          title: isAr ? item.nameAr : item.nameEn,
-                          desc: isAr ? item.descAr : item.descEn
-                        });
-                      }}
-                      className="bg-amber-500 p-1 rounded text-slate-950 text-[10px] shadow-md hover:scale-110 transition active:scale-95 cursor-pointer"
-                      title={isAr ? "عرض كامل وتكبير" : "Zoom"}
-                    >
-                      🔍
-                    </button>
-                  </div>
-                </div>
-
-                {/* Info Text */}
-                <div className={`flex-1 min-w-0 ${isAr ? "text-right" : "text-left"}`}>
-                  <div className="flex items-center justify-between gap-1">
-                    <h4 className={`text-[11px] font-extrabold truncate ${isSelected ? "text-amber-400" : ""}`}>
-                      {isAr ? item.nameAr : item.nameEn}
-                    </h4>
-                    {isSelected && (
-                      <span className="text-amber-500 text-[10px] font-bold">✓</span>
-                    )}
-                  </div>
-                  <p className="text-[9px] text-slate-400 truncate mt-0.5" title={isAr ? item.descAr : item.descEn}>
-                    {isAr ? item.descAr : item.descEn}
-                  </p>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="inline-block text-[8px] px-1.5 py-0.2 bg-slate-800/40 text-[#cca05a] rounded font-medium border border-white/5">
-                      {isAr ? item.tagAr : item.tagEn}
-                    </span>
-                    <span className="text-[8px] font-mono text-slate-500">
-                      {isSelected ? (isAr ? "نشط" : "Active") : ""}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* ⚙️ SMART NOTIFICATION CONTROL BAR (Simulate trigger & Settings) */}
