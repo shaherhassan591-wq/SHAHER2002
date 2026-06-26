@@ -13,10 +13,10 @@ buildscript {
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }
-    configurations.all {
+    configurations.classpath {
         resolutionStrategy {
-            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
-            force 'org.bouncycastle:bcpkix-jdk18on:1.78.1'
+            force 'org.bouncycastle:bcprov-jdk18on:1.76'
+            force 'org.bouncycastle:bcpkix-jdk18on:1.76'
         }
     }
 }
@@ -30,8 +30,8 @@ allprojects {
     }
     configurations.all {
         resolutionStrategy {
-            force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
-            force 'org.bouncycastle:bcpkix-jdk18on:1.78.1'
+            force 'org.bouncycastle:bcprov-jdk18on:1.76'
+            force 'org.bouncycastle:bcpkix-jdk18on:1.76'
         }
     }
 }

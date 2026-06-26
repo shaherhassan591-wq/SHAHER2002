@@ -84,6 +84,32 @@ async function run() {
       console.warn('Failed to set permissions for gradlew:', chmodErr.message);
     }
   }
+
+  // Inject BouncyCastle workaround into subprojects' buildscript classpaths
+  const subprojectGradleFiles = [
+    path.join(process.cwd(), 'node_modules', '@capacitor', 'android', 'capacitor', 'build.gradle'),
+    path.join(process.cwd(), 'node_modules', '@capacitor', 'local-notifications', 'android', 'build.gradle')
+  ];
+
+  for (const file of subprojectGradleFiles) {
+    if (fs.existsSync(file)) {
+      try {
+        let content = fs.readFileSync(file, 'utf8');
+        if (!content.includes('bcprov-jdk18on:1.76')) {
+          console.log(`Injecting BouncyCastle force 1.76 into: ${file}`);
+          content = content.replace(
+            /buildscript\s*\{/,
+            "buildscript {\n    configurations.classpath {\n        resolutionStrategy {\n            force 'org.bouncycastle:bcprov-jdk18on:1.76'\n            force 'org.bouncycastle:bcpkix-jdk18on:1.76'\n        }\n    }"
+          );
+          fs.writeFileSync(file, content, 'utf8');
+          console.log(`Successfully patched: ${file}`);
+        }
+      } catch (err) {
+        console.warn(`Could not patch ${file}:`, err.message);
+      }
+    }
+  }
+
   console.log('====================================================');
 }
 
