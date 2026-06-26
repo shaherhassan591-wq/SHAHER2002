@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ana Muslim</string>
+    <string name="title_activity_main">Ana Muslim</string>
+    <string name="package_name">com.anamuslim.app</string>
+    <string name="custom_url_scheme">com.anamuslim.app</string>
+</resources>

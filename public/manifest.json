@@ -1,0 +1,19 @@
+{
+  "id": "com.anamuslim.app",
+  "short_name": "أنا مسلم",
+  "name": "أنا مسلم - الحقيبة الروحية والمنهاج اليومي",
+  "description": "حقيبة المسلم الشاملة لأذكار الصباح والمساء والقرآن الكريم والتقويم الهجري والصلوات والورد اليومي.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2913/2913520.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#071b29",
+  "theme_color": "#071b29",
+  "display": "standalone",
+  "orientation": "portrait"
+}

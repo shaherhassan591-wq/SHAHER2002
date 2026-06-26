@@ -1,0 +1,141 @@
+name: Build Offline Android APK ('أنا مسلم')
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual trigger from GitHub website/app on mobile
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3. Setup Java JDK for Android compilation
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      # 3b. Deep Clean Workspace
+      - name: Deep Clean Workspace
+        run: |
+          echo "Decongesting pre-existing node environments and structures..."
+          rm -rf node_modules package-lock.json dist android
+          
+      # 4. Install npm dependencies cleanly
+      - name: Fresh Install Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          # Ensure platform-specific tailwind oxide is fetched for the linux host runners
+          npm install @tailwindcss/oxide-linux-x64 --legacy-peer-deps || echo "Optional Tailwind package sync skipped"
+
+      # 5. Build static React production site assets
+      - name: Build Web Application (React/Vite)
+        run: npm run build
+
+      # 6. Initialize and Synchronize Capacitor Android Platform (Clean Dynamic Build)
+      - name: Sync Capacitor Android
+        run: |
+          # Install core Capacitor platform and CLI globally/locally
+          npm install @capacitor/cli @capacitor/android
+          
+          # Force delete old android directory/cache to prevent conflicts
+          rm -rf android
+          
+          echo "Creating a fresh android module..."
+          npx cap add android
+          
+          echo "Injecting verified Java 21-compliant Android templates..."
+          cp public/android-config/build.gradle android/build.gradle
+          cp public/android-config/variables.gradle android/variables.gradle
+          cp public/android-config/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
+          
+          # If gradle-wrapper.jar is missing or has 0 bytes, download it raw from Gradle source
+          if [ ! -s "public/android-config/gradle-wrapper.jar" ]; then
+            echo "Local gradle-wrapper.jar is missing or is 0 bytes. Downloading fresh jar..."
+            curl -L -o public/android-config/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar
+          fi
+          
+          mkdir -p android/gradle/wrapper/
+          cp public/android-config/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.jar
+          
+          # Absolute Fail-Safe: Validate that android/gradle/wrapper/gradle-wrapper.jar has non-zero size
+          if [ ! -s "android/gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Failed to copy or locate active wrapper jar. Hydrating directly..."
+            curl -L -o android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar
+          fi
+          
+          cp public/android-config/app-build.gradle android/app/build.gradle
+          
+          # Update Capacitor dependencies & copy latest static web build to android project
+          npx cap sync android
+
+          # Absolute Fail-Safe: Patch the Build.VERSION_CODES.VANILLA_ICE_CREAM compilation bug in @capacitor/android
+          echo "Patching Build.VERSION_CODES.VANILLA_ICE_CREAM in SystemBars.java to bypass compilation errors..."
+          sed -i 's/Build.VERSION_CODES.VANILLA_ICE_CREAM/35/g' node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/plugin/SystemBars.java || echo "Sed patch failed"
+
+      # 6.5. Generate Native App Resources (Icons & Splash screens)
+      - name: Generate Native App Resources
+        run: |
+          # Prepare the assets directory if not already populated
+          mkdir -p assets
+          
+          # Ensure assets/icon.png and assets/splash.png are present
+          if [ -f "assets/icon.png" ]; then
+            echo "Icon detected! Copying to required formats..."
+            cp assets/icon.png assets/icon-only.png || true
+            cp assets/icon.png assets/icon-foreground.png || true
+            cp assets/icon.png assets/icon-background.png || true
+          fi
+          
+          if [ ! -f "assets/splash.png" ] && [ -f "public/splash_screen.jpg" ]; then
+            echo "Generating splash screen from public asset..."
+            cp public/splash_screen.jpg assets/splash.png
+            cp public/splash_screen.jpg assets/splash-only.png || true
+          fi
+          
+          # Execute the resource generator to populate mipmap/drawable sizes in android module
+          npx @capacitor/assets generate --android
+
+      # 7. Grant execution rights for Gradlew executable inside Android subdirectory
+      - name: Make Gradle wrapper executable & Setup Android SDK 35
+        run: |
+          chmod +x android/gradlew
+          echo "Accepting Android SDK Licenses..."
+          # Locate sdkmanager dynamically in typical runners
+          SDKMANAGER_PATH="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDKMANAGER_PATH" ]; then
+            SDKMANAGER_PATH=$(which sdkmanager || echo "sdkmanager")
+          fi
+          echo "Using sdkmanager from: $SDKMANAGER_PATH"
+          yes | $SDKMANAGER_PATH --licenses || echo "sdkmanager licenses accept skipped"
+          echo "Installing/Updating Android SDK Platform 35 and Build Tools..."
+          $SDKMANAGER_PATH "platforms;android-35" "build-tools;35.0.0" || echo "sdkmanager install skipped"
+
+      # 8. Compile the debug APK using standard Gradle tasks
+      - name: Build Android Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      # 9. Upload the generated APK binary as a secure workflow artifact
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ana-muslim-offline-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7

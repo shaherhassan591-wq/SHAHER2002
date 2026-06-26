@@ -1,0 +1,12 @@
+{
+  "name": "Remix: Remix: أنا مسلم - Ana Muslim",
+  "appId": "com.anamuslim.app",
+  "description": "تطبيق إسلامي متكامل يحتوي على القرآن الكريم، أوقات الصلاة مع الأذان بأصوات متعددة، الأذكار، التسبيح، الأحاديث النبوية الشريفة، والقبلة، بتصميم إسلامي فاخر يدعم الوضع الليلي والنهاري والمستوحى من الهوية البصرية الأنيقة.",
+  "requestFramePermissions": [
+    "notifications",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
