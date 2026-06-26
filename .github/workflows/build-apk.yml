@@ -62,21 +62,17 @@ jobs:
           echo "Injecting verified Java 21-compliant Android templates..."
           cp public/android-config/build.gradle android/build.gradle
           cp public/android-config/variables.gradle android/variables.gradle
-          cp public/android-config/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
-          
-          # If gradle-wrapper.jar is missing or has 0 bytes, download it raw from Gradle source
-          if [ ! -s "public/android-config/gradle-wrapper.jar" ]; then
-            echo "Local gradle-wrapper.jar is missing or is 0 bytes. Downloading fresh jar..."
-            curl -L -o public/android-config/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar
-          fi
           
           mkdir -p android/gradle/wrapper/
-          cp public/android-config/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.jar
+          cp public/android-config/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
           
-          # Absolute Fail-Safe: Validate that android/gradle/wrapper/gradle-wrapper.jar has non-zero size
-          if [ ! -s "android/gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Failed to copy or locate active wrapper jar. Hydrating directly..."
-            curl -L -o android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar
+          echo "Copying verified local gradle-wrapper.jar to android/gradle/wrapper/gradle-wrapper.jar..."
+          cp public/android-config/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.jar || true
+          
+          # If the file is missing or corrupted (e.g. Git LFS pointer), download it raw from Gradle source
+          if [ ! -f "android/gradle/wrapper/gradle-wrapper.jar" ] || [ $(wc -c < "android/gradle/wrapper/gradle-wrapper.jar") -lt 50000 ]; then
+            echo "Local gradle-wrapper.jar is missing, corrupted, or an LFS pointer. Downloading a pristine wrapper jar..."
+            curl -L -o android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v7.6.1/gradle/wrapper/gradle-wrapper.jar
           fi
           
           cp public/android-config/app-build.gradle android/app/build.gradle

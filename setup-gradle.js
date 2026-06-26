@@ -2,10 +2,11 @@ import fs from 'fs';
 import https from 'https';
 import path from 'path';
 
-const JAR_URL = 'https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar';
+const JAR_URL = 'https://raw.githubusercontent.com/gradle/gradle/v7.6.1/gradle/wrapper/gradle-wrapper.jar';
 
 const paths = [
   path.join(process.cwd(), 'android-config', 'gradle-wrapper.jar'),
+  path.join(process.cwd(), 'public', 'android-config', 'gradle-wrapper.jar'),
   path.join(process.cwd(), 'android', 'gradle', 'wrapper', 'gradle-wrapper.jar')
 ];
 
