@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { RotateCcw, Volume2, VolumeX, Flame, Heart, Sparkles, BookOpen } from "lucide-react";
 
-export default function TasbihView() {
+export default function TasbihView({ darkMode = true }: { darkMode?: boolean }) {
   const [count, setCount] = useState<number>(0);
   const [totalSession, setTotalSession] = useState<number>(0);
   const [target, setTarget] = useState<number>(33); // 33, 100, or custom
@@ -114,20 +114,30 @@ export default function TasbihView() {
   ];
 
   return (
-    <div className="flex flex-col items-center justify-between h-full bg-gradient-to-b from-[#0a2335] via-[#071b29] to-[#04111a] text-white p-6 font-sans select-none">
+    <div className={`flex flex-col items-center justify-between h-full p-6 font-sans select-none ${
+      darkMode 
+        ? "bg-gradient-to-b from-[#0a2335] via-[#071b29] to-[#04111a] text-white" 
+        : "bg-gradient-to-b from-amber-50/25 via-amber-50/45 to-amber-100/50 text-slate-900"
+    }`}>
       
       {/* Top Config Area */}
-      <div className="w-full max-w-md bg-[#0a2e47]/40 backdrop-blur-md rounded-2xl border border-[#cca05a]/20 p-4 space-y-4">
+      <div className={`w-full max-w-md rounded-2xl border p-4 space-y-4 ${
+        darkMode ? "bg-[#0a2e47]/40 backdrop-blur-md border-[#cca05a]/20" : "bg-white border-amber-900/15 shadow-sm"
+      }`}>
         {/* Title & sound selection */}
-        <div className="flex justify-between items-center bg-[#073957]/50 p-2 rounded-xl">
+        <div className={`flex justify-between items-center p-2 rounded-xl ${
+          darkMode ? "bg-[#073957]/50" : "bg-slate-50"
+        }`}>
           <div className="flex items-center space-x-2 space-x-reverse text-[#cca05a]">
             <Sparkles className="w-5 h-5 animate-pulse" />
-            <span className="font-bold text-sm">المسبحة الإلكترونية الإلكترونية الذكية</span>
+            <span className={`font-bold text-sm ${darkMode ? "text-[#cca05a]" : "text-amber-950"}`}>المسبحة الإلكترونية الذكية</span>
           </div>
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-2 rounded-lg transition ${
-              soundEnabled ? "bg-[#cca05a]/20 text-yellow-300" : "bg-red-950/20 text-red-400"
+            className={`p-2 rounded-lg transition cursor-pointer ${
+              soundEnabled 
+                ? darkMode ? "bg-[#cca05a]/20 text-yellow-300" : "bg-amber-100 text-amber-950 border border-amber-200" 
+                : "bg-red-950/20 text-red-400"
             }`}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -136,7 +146,7 @@ export default function TasbihView() {
 
         {/* Selected phrase carousell */}
         <div className="space-y-1">
-          <label className="text-xs text-amber-200/60 block text-right font-medium">اختر الذِكْر الحالي:</label>
+          <label className={`text-xs block text-right font-semibold ${darkMode ? "text-amber-200/80" : "text-amber-950"}`}>اختر الذِكْر الحالي:</label>
           <div className="flex overflow-x-auto gap-2 py-1 scrollbar-none scroll-smooth items-center direction-rtl">
             {phrasesList.map((phrase, idx) => (
               <button
@@ -145,10 +155,12 @@ export default function TasbihView() {
                   setActivePhrase(phrase);
                   setCount(0);
                 }}
-                className={`flex-none text-xs px-3 py-1.5 rounded-full border transition-all ${
+                className={`flex-none text-xs px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
                   activePhrase === phrase
-                    ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-bold border-transparent shadow-lg scale-105"
-                    : "bg-[#0b283d] text-amber-100/80 border-[#cca05a]/10 hover:border-[#cca05a]/30"
+                    ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-extrabold border-transparent shadow-lg scale-105"
+                    : darkMode
+                    ? "bg-[#0b283d] text-amber-100/80 border-[#cca05a]/10 hover:border-[#cca05a]/30"
+                    : "bg-amber-50 text-amber-950 border-amber-900/10 hover:border-amber-900/30 font-semibold"
                 }`}
               >
                 {phrase}
@@ -158,8 +170,10 @@ export default function TasbihView() {
         </div>
 
         {/* Goals selector */}
-        <div className="flex justify-between items-center text-xs bg-[#061e2f]/40 p-2 rounded-xl border border-white/5">
-          <span className="text-amber-200/50">الهدف الحالي:</span>
+        <div className={`flex justify-between items-center text-xs p-2 rounded-xl border ${
+          darkMode ? "bg-[#061e2f]/40 border-white/5" : "bg-slate-50 border-slate-150"
+        }`}>
+          <span className={`font-semibold ${darkMode ? "text-amber-200/80" : "text-amber-900"}`}>الهدف الحالي:</span>
           <div className="flex gap-1.5">
             {[33, 99, 100, 1000].map((t) => (
               <button
@@ -168,10 +182,12 @@ export default function TasbihView() {
                   setTarget(t);
                   setCount(0);
                 }}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-xs font-bold ${
                   target === t
-                    ? "bg-[#cca05a] text-slate-900 font-bold"
-                    : "bg-[#09263a] text-white/70"
+                    ? "bg-[#cca05a] text-slate-950"
+                    : darkMode
+                    ? "bg-[#09263a] text-white/70 hover:text-white"
+                    : "bg-slate-200 text-slate-800 hover:bg-slate-300"
                 }`}
               >
                 {t === 1000 ? "مفتوح" : t}
@@ -184,15 +200,19 @@ export default function TasbihView() {
       {/* Main Interactive Counter Bead */}
       <div className="flex flex-col items-center justify-center py-6 w-full max-w-xs relative">
         {/* Total counts badges */}
-        <div className="absolute top-0 flex gap-2 w-full justify-between items-center text-xs border-b border-white/5 pb-2">
-          <div className="flex items-center space-x-1 space-x-reverse text-amber-200">
-            <Flame className="w-4 h-4 text-orange-400 animate-bounce" />
-            <span>مجموع التسبيحات اليوم:</span>
-            <span className="font-mono font-bold text-lg text-white ml-1">{totalSession}</span>
+        <div className={`absolute top-0 flex gap-2 w-full justify-between items-center text-xs border-b pb-2 ${
+          darkMode ? "border-white/5" : "border-slate-200"
+        }`}>
+          <div className="flex items-center space-x-1 space-x-reverse">
+            <Flame className="w-4 h-4 text-orange-500 animate-bounce" />
+            <span className={`font-semibold ${darkMode ? "text-amber-200" : "text-amber-900"}`}>مجموع التسبيحات اليوم:</span>
+            <span className={`font-mono font-bold text-lg ml-1 ${darkMode ? "text-white" : "text-slate-950"}`}>{totalSession}</span>
           </div>
           <button
             onClick={handleClearTotal}
-            className="text-[10px] text-red-300 hover:text-red-400 opacity-60 hover:opacity-100 transition"
+            className={`text-[10px] font-bold hover:underline transition cursor-pointer ${
+              darkMode ? "text-red-300 hover:text-red-400" : "text-red-600 hover:text-red-700"
+            }`}
           >
             تصفير المجموع
           </button>
@@ -202,18 +222,24 @@ export default function TasbihView() {
         <motion.button
           onClick={handleIncrement}
           whileTap={{ scale: 0.94 }}
-          className="relative mt-8 w-60 h-60 rounded-full flex flex-col items-center justify-center bg-gradient-to-br from-[#123e5c] via-[#092c42] to-[#041624] border-4 border-[#cca05a] shadow-[0_0_40px_rgba(204,160,90,0.25)] hover:shadow-[0_0_50px_rgba(204,160,90,0.4)] transition-all cursor-pointer overflow-hidden group outline-none"
+          className={`relative mt-8 w-60 h-60 rounded-full flex flex-col items-center justify-center border-4 shadow-xl transition-all cursor-pointer overflow-hidden group outline-none ${
+            darkMode
+              ? "bg-gradient-to-br from-[#123e5c] via-[#092c42] to-[#041624] border-[#cca05a] shadow-[0_0_40px_rgba(204,160,90,0.25)] hover:shadow-[0_0_50px_rgba(204,160,90,0.4)]"
+              : "bg-gradient-to-br from-amber-50 via-white to-amber-100 border-[#cca05a] shadow-lg hover:shadow-xl"
+          }`}
         >
           {/* Ripple animation on click */}
           {isRippling && (
-            <span className="absolute inset-0 bg-amber-400/10 rounded-full animate-ping pointer-events-none" />
+            <span className="absolute inset-0 bg-amber-400/20 rounded-full animate-ping pointer-events-none" />
           )}
 
           {/* Decorative glowing backplate */}
-          <div className="absolute inset-2 rounded-full border border-[#cca05a]/20 bg-radial-gradient from-transparent to-slate-950/20" />
+          <div className={`absolute inset-2 rounded-full border ${
+            darkMode ? "border-[#cca05a]/20 bg-radial-gradient from-transparent to-slate-950/20" : "border-amber-900/5"
+          }`} />
           
           {/* Floating animated beads on the perimeter */}
-          <div className="absolute inset-4 rounded-full border border-dashed border-amber-300/30 animate-spin-slow pointer-events-none" />
+          <div className="absolute inset-4 rounded-full border border-dashed border-amber-500/30 animate-spin-slow pointer-events-none" />
 
           {/* Golden Islamic Geometric Logo in Center Background */}
           <svg className="absolute w-44 h-44 opacity-10 text-[#cca05a]" viewBox="0 0 100 100" fill="currentColor">
@@ -221,16 +247,24 @@ export default function TasbihView() {
           </svg>
 
           {/* Selection Dhikr Name */}
-          <span className="text-sm font-bold text-amber-100 tracking-wide z-10 opacity-90 mb-1 max-w-[80%] text-center line-clamp-1 truncate">
+          <span className={`text-sm font-extrabold tracking-wide z-10 mb-1 max-w-[80%] text-center line-clamp-1 truncate ${
+            darkMode ? "text-amber-100" : "text-amber-950"
+          }`}>
             {activePhrase}
           </span>
 
           {/* Beautiful Number Presentation */}
-          <div className="relative text-7xl font-bold font-sans tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-white to-amber-200 drop-shadow-md z-10 my-1 font-mono">
+          <div className={`relative text-7xl font-extrabold font-sans tracking-wide drop-shadow-md z-10 my-1 font-mono ${
+            darkMode 
+              ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-white to-amber-200" 
+              : "text-slate-950"
+          }`}>
             {count}
           </div>
 
-          <span className="text-[10px] font-mono tracking-widest text-[#cca05a] z-10 uppercase mt-1">
+          <span className={`text-[10px] font-bold font-mono tracking-widest z-10 uppercase mt-1 ${
+            darkMode ? "text-[#cca05a]" : "text-amber-900"
+          }`}>
             {count === 0 ? "اضغط للبدء" : `بقي ${target - count}`}
           </span>
 
@@ -242,11 +276,11 @@ export default function TasbihView() {
               r="47.5"
               fill="transparent"
               stroke="#cca05a"
-              strokeWidth="1.5"
+              strokeWidth="2.2"
               strokeDasharray="298"
               strokeDashoffset={298 - (298 * count) / target}
               className="transition-all duration-100"
-              opacity="0.8"
+              opacity="0.85"
             />
           </svg>
         </motion.button>
@@ -257,16 +291,22 @@ export default function TasbihView() {
         {/* Reset button counter */}
         <button
           onClick={handleReset}
-          className="flex items-center justify-center space-x-2 space-x-reverse bg-slate-900 hover:bg-slate-800 border border-[#cca05a]/25 text-amber-100/90 text-xs py-2 px-5 rounded-full shadow-lg transition active:scale-95"
+          className={`flex items-center justify-center space-x-2 space-x-reverse font-bold text-xs py-2.5 px-6 rounded-full shadow-lg transition active:scale-95 cursor-pointer border ${
+            darkMode 
+              ? "bg-slate-900 hover:bg-slate-800 border-[#cca05a]/25 text-amber-100" 
+              : "bg-white hover:bg-slate-50 border-amber-900/10 text-amber-950"
+          }`}
         >
-          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+          <RotateCcw className={`w-3.5 h-3.5 ${darkMode ? "text-amber-400" : "text-amber-900"}`} />
           <span>تصفير الدورة الحالية</span>
         </button>
       </div>
 
       {/* Inspirational Hadith Quote on Tasbih */}
-      <div className="w-full max-w-md text-center bg-[#cca05a]/5 p-2 rounded-xl border border-[#cca05a]/10 text-xs text-amber-200/70 mt-2 flex items-center justify-center space-x-1.5 space-x-reverse">
-        <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-none" />
+      <div className={`w-full max-w-md text-center p-2 rounded-xl border text-xs mt-2 flex items-center justify-center space-x-1.5 space-x-reverse ${
+        darkMode ? "bg-[#cca05a]/5 border-[#cca05a]/10 text-amber-200/80" : "bg-amber-50 border-amber-900/10 text-amber-950 font-semibold"
+      }`}>
+        <Sparkles className={`w-3.5 h-3.5 flex-none ${darkMode ? "text-amber-400" : "text-amber-900"}`} />
         <p className="line-clamp-1 italic font-sans leading-relaxed">
           - "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ" - الرعد 28
         </p>

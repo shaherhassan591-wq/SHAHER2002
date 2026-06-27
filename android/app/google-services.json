@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1092790092747",
+    "project_id": "anamuslim-app",
+    "storage_bucket": "anamuslim-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1092790092747:android:fb01da36767bc6696dac4e",
+        "android_client_info": {
+          "package_name": "com.anamuslim.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmHqIucNILjRfQx7HO10NIfel0hW-NglE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

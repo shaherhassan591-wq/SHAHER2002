@@ -18,7 +18,7 @@ interface HijriDateDetails {
   occasion?: string;
 }
 
-export default function CalendarView() {
+export default function CalendarView({ darkMode = true }: { darkMode?: boolean }) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [occasionsList, setOccasionsList] = useState<Array<{ name: string; dateStr: string; status: string }>>([]);
@@ -144,18 +144,22 @@ export default function CalendarView() {
     : "";
 
   return (
-    <div className="flex flex-col h-full bg-[#071b29] text-white p-4 font-sans select-none overflow-y-auto">
+    <div className={`flex flex-col h-full p-4 font-sans select-none overflow-y-auto ${
+      darkMode ? "bg-[#071b29] text-white" : "bg-amber-50/40 text-slate-900"
+    }`}>
       
       {/* Dynamic Header */}
-      <div className="bg-gradient-to-r from-[#0d3652] to-[#051f30] rounded-2xl border border-[#cca05a]/30 p-5 shadow-xl relative overflow-hidden mb-6 flex-none text-right" style={{ direction: "rtl" }}>
+      <div className={`rounded-2xl border p-5 shadow-xl relative overflow-hidden mb-6 flex-none text-right ${
+        darkMode ? "bg-gradient-to-r from-[#0d3652] to-[#051f30] border-[#cca05a]/30 text-white" : "bg-gradient-to-r from-[#e8dcc4] to-[#f5ebd6] border-amber-900/10 text-slate-900"
+      }`} style={{ direction: "rtl" }}>
         <div className="absolute left-6 top-6 opacity-[0.03] text-8xl text-amber-500 pointer-events-none">🗓</div>
         <div className="space-y-1 z-10">
-          <span className="text-xs text-[#cca05a] tracking-widest block font-bold">مواقيت التقويم الإسلامي والمعاش</span>
-          <h2 className="text-base font-bold text-yellow-101 flex items-center justify-start space-x-1.5 space-x-reverse text-amber-100">
-            <CalendarIcon className="w-5 h-5 text-amber-400" />
-            <span>التقويم الهجري والميلادي الشامل</span>
+          <span className={`text-xs tracking-widest block font-bold ${darkMode ? "text-[#cca05a]" : "text-amber-950"}`}>مواقيت التقويم الإسلامي والمعاش</span>
+          <h2 className="text-base font-bold flex items-center justify-start space-x-1.5 space-x-reverse text-amber-100 dark:text-amber-50">
+            <CalendarIcon className={`w-5 h-5 ${darkMode ? "text-amber-400" : "text-amber-900"}`} />
+            <span className={darkMode ? "text-amber-100" : "text-amber-950"}>التقويم الهجري والميلادي الشامل</span>
           </h2>
-          <p className="text-xs text-slate-300 font-light max-w-xl leading-relaxed mt-1">
+          <p className={`text-xs font-light max-w-xl leading-relaxed mt-1 ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
             تابع التواريخ الهجرية المقترنة بالميلادية يوماً بيوم، وتعرّف على المناسبات الدينية والأيام الفضيلة وفقاً لحسابات أم القرى الموثقة.
           </p>
         </div>
@@ -166,34 +170,42 @@ export default function CalendarView() {
         
         {/* Right Section: The Month Calendar Grid */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-gradient-to-br from-[#0a273c] to-[#051624] rounded-2xl border border-white/5 p-5 shadow-xl">
+          <div className={`rounded-2xl border p-5 shadow-xl ${
+            darkMode ? "bg-gradient-to-br from-[#0a273c] to-[#051624] border-white/5" : "bg-white border-amber-900/10"
+          }`}>
             
             {/* Nav controls */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/5 mb-4">
+            <div className={`flex items-center justify-between pb-4 border-b mb-4 ${darkMode ? "border-white/5" : "border-slate-100"}`}>
               <button
                 onClick={handlePrevMonth}
-                className="p-1.5 rounded-lg bg-slate-900 border border-white/5 hover:border-[#cca05a]/30 transition text-amber-100 cursor-pointer"
+                className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                  darkMode ? "bg-slate-900 border-white/5 text-amber-100 hover:border-[#cca05a]/30" : "bg-amber-50 border-amber-900/10 text-amber-950 hover:bg-amber-100"
+                }`}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
 
               <div className="text-center">
-                <h3 className="text-sm font-extrabold text-[#cca05a]">{gregorianMonthTitle}</h3>
-                <span className="text-[10px] text-zinc-400 block font-light mt-0.5">
+                <h3 className={`text-sm font-extrabold ${darkMode ? "text-[#cca05a]" : "text-amber-950"}`}>{gregorianMonthTitle}</h3>
+                <span className={`text-[10px] block font-semibold mt-0.5 ${darkMode ? "text-zinc-400" : "text-slate-600"}`}>
                   🕌 يوافق تقريباً: {firstHijri.monthName} {firstHijri.year} هـ - {lastHijri.monthName} {lastHijri.year} هـ
                 </span>
               </div>
 
               <button
                 onClick={handleNextMonth}
-                className="p-1.5 rounded-lg bg-slate-900 border border-white/5 hover:border-[#cca05a]/30 transition text-amber-100 cursor-pointer"
+                className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                  darkMode ? "bg-slate-900 border-white/5 text-amber-100 hover:border-[#cca05a]/30" : "bg-amber-50 border-amber-900/10 text-amber-950 hover:bg-amber-100"
+                }`}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
             </div>
 
             {/* Week day letters (Sunday to Saturday) */}
-            <div className="grid grid-cols-7 gap-1 text-center mb-3 text-[11px] font-bold text-amber-200/60">
+            <div className={`grid grid-cols-7 gap-1 text-center mb-3 text-[11px] font-bold ${
+              darkMode ? "text-amber-200/60" : "text-amber-900"
+            }`}>
               {arabicDayNames.map((day) => (
                 <div key={day} className="py-1">{day}</div>
               ))}
@@ -221,15 +233,19 @@ export default function CalendarView() {
                     onClick={() => handleSelectDay(dayNum)}
                     className={`h-16 rounded-xl flex flex-col justify-between p-1.5 border transition duration-300 relative cursor-pointer ${
                       selected
-                        ? "bg-[#cca05a]/25 border-[#cca05a] text-white font-extrabold shadow-lg scale-102"
+                        ? darkMode 
+                          ? "bg-[#cca05a]/25 border-[#cca05a] text-white font-extrabold shadow-lg scale-102"
+                          : "bg-[#cca05a]/20 border-[#cca05a] text-amber-950 font-extrabold shadow-md scale-102"
                         : active
                         ? "bg-gradient-to-b from-amber-500 to-[#cca05a] border-transparent text-slate-950 font-extrabold"
-                        : "bg-slate-950/40 border-white/5 text-slate-200 hover:border-[#cca05a]/30 hover:bg-slate-950/70"
+                        : darkMode
+                        ? "bg-slate-950/40 border-white/5 text-slate-200 hover:border-[#cca05a]/30 hover:bg-slate-950/70"
+                        : "bg-white border-amber-900/5 text-slate-800 hover:border-[#cca05a]/40 hover:bg-amber-50/50"
                     }`}
                   >
                     {/* Occasion indicator micro dot */}
                     {hijriInfo.occasion && (
-                      <span className="absolute top-1 left-1.5 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="absolute top-1 left-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                     )}
 
                     {/* upper half: Gregorian Day */}
@@ -239,7 +255,11 @@ export default function CalendarView() {
 
                     {/* lower half: Hijri Day */}
                     <span className={`text-[9px] font-semibold text-left block w-full select-none ${
-                      selected ? "text-amber-200" : active ? "text-slate-900/80 font-bold" : "text-[#cca05a]"
+                      selected 
+                        ? (darkMode ? "text-amber-200" : "text-amber-950") 
+                        : active 
+                        ? "text-slate-900/80 font-bold" 
+                        : "text-[#cca05a]"
                     }`}>
                       {hijriInfo.day} هـ
                     </span>
@@ -249,7 +269,9 @@ export default function CalendarView() {
             </div>
 
             {/* Legend guide */}
-            <div className="flex items-center justify-start gap-4 mt-5 pt-3 border-t border-white/5 text-[10px] text-zinc-400">
+            <div className={`flex items-center justify-start gap-4 mt-5 pt-3 border-t text-[10px] ${
+              darkMode ? "border-white/5 text-zinc-400" : "border-slate-100 text-slate-600 font-medium"
+            }`}>
               <div className="flex items-center space-x-1 space-x-reverse">
                 <span className="w-2.5 h-2.5 rounded bg-gradient-to-r from-amber-500 to-[#cca05a]" />
                 <span>اليوم الحالي</span>
@@ -259,7 +281,7 @@ export default function CalendarView() {
                 <span>اليوم المحدد</span>
               </div>
               <div className="flex items-center space-x-1 space-x-reverse">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <span>يوافق مناسبة دينية</span>
               </div>
             </div>
@@ -272,31 +294,39 @@ export default function CalendarView() {
           
           {/* Selected Date Card */}
           {selectedDate && selectedHijri && (
-            <div className="bg-[#0b253b] border border-[#cca05a]/20 p-5 rounded-2xl shadow-xl space-y-3.5 text-right">
+            <div className={`border p-5 rounded-2xl shadow-xl space-y-3.5 text-right ${
+              darkMode ? "bg-[#0b253b] border-[#cca05a]/20 text-white" : "bg-white border-amber-900/15 text-slate-900"
+            }`}>
               
-              <div className="flex items-center space-x-2 space-x-reverse text-[#cca05a] pb-2 border-b border-white/5">
-                <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
+              <div className={`flex items-center space-x-2 space-x-reverse pb-2 border-b ${
+                darkMode ? "border-white/5 text-[#cca05a]" : "border-slate-100 text-amber-950"
+              }`}>
+                <Clock className={`w-4 h-4 animate-pulse ${darkMode ? "text-amber-400" : "text-amber-900"}`} />
                 <span className="text-xs font-bold font-sans">معلومات اليوم المحدّد</span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] text-zinc-400 block">التاريخ الميلادي:</span>
-                <span className="text-xs font-bold text-white block">{selectedGregorianText}</span>
+                <span className={`text-[10px] block ${darkMode ? "text-zinc-400" : "text-slate-500"}`}>التاريخ الميلادي:</span>
+                <span className={`text-xs font-bold block ${darkMode ? "text-white" : "text-slate-900"}`}>{selectedGregorianText}</span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] text-zinc-400 block">التاريخ الهجري المبارك:</span>
-                <span className="text-sm font-extrabold text-amber-200 block">
+                <span className={`text-[10px] block ${darkMode ? "text-zinc-400" : "text-slate-500"}`}>التاريخ الهجري المبارك:</span>
+                <span className={`text-sm font-extrabold block ${darkMode ? "text-amber-200" : "text-amber-950"}`}>
                   {selectedHijri.day} {selectedHijri.monthName} {selectedHijri.year} هـ
                 </span>
               </div>
 
               {selectedHijri.occasion ? (
-                <div className="bg-emerald-510 bg-emerald-950/40 p-3 rounded-xl border border-emerald-500/20 text-[11px] text-emerald-300 leading-relaxed font-semibold">
+                <div className={`p-3 rounded-xl border text-[11px] leading-relaxed font-bold ${
+                  darkMode ? "bg-emerald-950/40 border-emerald-500/20 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-950"
+                }`}>
                   🎉 {selectedHijri.occasion}
                 </div>
               ) : (
-                <div className="bg-slate-950/20 p-2.5 rounded-lg text-[10px] text-slate-400 border border-white/5">
+                <div className={`p-2.5 rounded-lg text-[10px] border ${
+                  darkMode ? "bg-slate-950/20 text-slate-400 border-white/5" : "bg-slate-50 text-slate-600 border-slate-100"
+                }`}>
                   يوم اعتيادي مبارك، لا توجد مناسبة دينية رئيسية مدونة في هذا التاريخ.
                 </div>
               )}
@@ -304,24 +334,32 @@ export default function CalendarView() {
           )}
 
           {/* Upcoming Islamic highlights throughout the year */}
-          <div className="bg-gradient-to-br from-[#0a273c] to-[#051624] border border-white/5 p-4 rounded-2xl shadow-xl space-y-3">
-            <div className="flex items-center space-x-2 space-x-reverse text-[#cca05a] pb-1 border-b border-white/5">
-              <Award className="w-4 h-4 text-[#cca05a]" />
-              <h4 className="text-xs font-bold text-amber-100">أعظم المناسبات السنوية للهجرة</h4>
+          <div className={`border p-4 rounded-2xl shadow-xl space-y-3 ${
+            darkMode ? "bg-gradient-to-br from-[#0a273c] to-[#051624] border-white/5 text-white" : "bg-white border-amber-900/10 text-slate-900"
+          }`}>
+            <div className={`flex items-center space-x-2 space-x-reverse pb-1 border-b ${
+              darkMode ? "border-white/5 text-[#cca05a]" : "border-slate-100 text-amber-950"
+            }`}>
+              <Award className={`w-4 h-4 ${darkMode ? "text-[#cca05a]" : "text-amber-900"}`} />
+              <h4 className={`text-xs font-bold ${darkMode ? "text-amber-100" : "text-amber-950"}`}>أعظم المناسبات السنوية للهجرة</h4>
             </div>
 
-            <p className="text-[10px] text-zinc-400 font-light leading-relaxed">
+            <p className={`text-[10px] font-light leading-relaxed ${darkMode ? "text-zinc-400" : "text-slate-600"}`}>
               تذكير بالمواقيت المتداولة لأعظم المناسبات في السنة الحالية لتنال فضل التحضير والاستبشار:
             </p>
 
             <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
               {occasionsList.map((oc, i) => (
-                <div key={i} className="bg-slate-950/30 p-2.5 rounded-xl border border-white/5 flex items-center justify-between text-right text-[11px]">
+                <div key={i} className={`p-2.5 rounded-xl border flex items-center justify-between text-right text-[11px] ${
+                  darkMode ? "bg-slate-950/30 border-white/5" : "bg-slate-50 border-amber-900/5"
+                }`}>
                   <div>
-                    <span className="font-bold text-slate-100 block">{oc.name}</span>
+                    <span className={`font-bold block ${darkMode ? "text-slate-100" : "text-slate-950"}`}>{oc.name}</span>
                     <span className="text-[#cca05a] font-mono font-bold text-[10px] block mt-0.5">{oc.dateStr}</span>
                   </div>
-                  <span className="text-[9px] bg-[#cca05a]/10 text-amber-200/80 px-2 py-0.5 rounded border border-[#cca05a]/20 truncate shrink-0 ml-1.5">
+                  <span className={`text-[9px] px-2 py-0.5 rounded border truncate shrink-0 ml-1.5 ${
+                    darkMode ? "bg-[#cca05a]/10 text-amber-200/80 border-[#cca05a]/20" : "bg-amber-50 text-amber-950 border-amber-900/20 font-bold"
+                  }`}>
                     {oc.status}
                   </span>
                 </div>

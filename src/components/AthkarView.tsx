@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, RotateCcw, AlertCircle, Bookmark, Share2, Sparkles, BookOpen } from "lucide-react";
 import { athkarData } from "../data/islamicData";
 import { ZikrSection, Zikr } from "../types";
+import { useLanguage } from "../context/LanguageContext";
 
-export default function AthkarView() {
+export default function AthkarView({ darkMode = true }: { darkMode?: boolean }) {
   const [activeCategory, setActiveCategory] = useState<string>("morning");
   // Manage counters in state locally so they are responsive
   const [sections, setSections] = useState<ZikrSection[]>(() => 
@@ -12,6 +13,7 @@ export default function AthkarView() {
   );
   const audioContextRef = useRef<AudioContext | null>(null);
   const [sharedId, setSharedId] = useState<string | null>(null);
+  const { isAr } = useLanguage();
 
   useEffect(() => {
     const checkPendingCategory = () => {
@@ -132,9 +134,13 @@ export default function AthkarView() {
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className="flex flex-col h-full bg-[#071b29] text-white p-4 font-sans select-none overflow-y-auto">
+    <div className={`flex flex-col h-full p-4 font-sans select-none overflow-y-auto ${
+      darkMode ? "bg-[#071b29] text-white" : "bg-amber-50/40 text-slate-900"
+    }`}>
       {/* Category Selection Tabs */}
-      <div className="flex bg-[#051520] p-1.5 rounded-xl border border-white/5 shadow-inner mb-5 gap-2 direction-rtl">
+      <div className={`flex p-1.5 rounded-xl border shadow-inner mb-5 gap-2 direction-rtl ${
+        darkMode ? "bg-[#051520] border-white/5" : "bg-white border-amber-900/10"
+      }`}>
         {sections.map((sec) => (
           <button
             key={sec.id}
@@ -142,7 +148,9 @@ export default function AthkarView() {
             className={`flex-1 flex items-center justify-center space-x-2 space-x-reverse py-2.5 rounded-lg text-xs font-bold transition-all ${
               activeCategory === sec.id
                 ? "bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 font-extrabold shadow-md scale-[1.02]"
-                : "text-slate-300 hover:text-white hover:bg-white/5"
+                : darkMode 
+                ? "text-slate-300 hover:text-white hover:bg-white/5" 
+                : "text-slate-700 hover:text-slate-950 hover:bg-amber-900/5"
             }`}
           >
             <span className="truncate">{sec.title}</span>
@@ -151,22 +159,26 @@ export default function AthkarView() {
       </div>
 
       {/* Progress Card */}
-      <div className="bg-[#0b2638] rounded-2xl border border-[#cca05a]/25 p-4 mb-5 flex justify-between items-center shadow-lg relative overflow-hidden">
+      <div className={`rounded-2xl border p-4 mb-5 flex justify-between items-center shadow-lg relative overflow-hidden ${
+        darkMode ? "bg-[#0b2638] border-[#cca05a]/25 text-white" : "bg-white border-amber-900/15 text-slate-900"
+      }`}>
         <div className="absolute right-0 top-0 opacity-10 font-bold text-7xl select-none pointer-events-none text-[#cca05a] pr-4">
           🕌
         </div>
         <div className="space-y-1 z-10">
-          <span className="text-xs text-amber-200/60 block text-right font-medium">نسبة الإنجاز في الأذكار الحالية</span>
+          <span className={`text-xs block text-right font-semibold ${darkMode ? "text-amber-200/80" : "text-amber-900"}`}>نسبة الإنجاز في الأذكار الحالية</span>
           <div className="flex items-center space-x-2 space-x-reverse">
-            <span className="text-2xl font-bold text-amber-100">{completedItems}</span>
-            <span className="text-xs text-slate-300">من أصل</span>
+            <span className={`text-2xl font-bold ${darkMode ? "text-amber-100" : "text-amber-950"}`}>{completedItems}</span>
+            <span className={`text-xs ${darkMode ? "text-slate-300" : "text-slate-600"}`}>من أصل</span>
             <span className="text-lg font-bold text-[#cca05a]">{totalItems}</span>
           </div>
         </div>
 
         {/* Circular Progress Display */}
-        <div className="relative w-16 h-16 flex items-center justify-center bg-slate-950/40 rounded-full border border-white/5">
-          <span className="text-xs font-bold font-mono text-amber-200">{progressPercent}%</span>
+        <div className={`relative w-16 h-16 flex items-center justify-center rounded-full border ${
+          darkMode ? "bg-slate-950/40 border-white/5" : "bg-slate-50 border-amber-900/10"
+        }`}>
+          <span className={`text-xs font-bold font-mono ${darkMode ? "text-amber-200" : "text-amber-950"}`}>{progressPercent}%</span>
           <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
             <circle
               cx="18"
@@ -190,15 +202,17 @@ export default function AthkarView() {
             <div
               key={item.id}
               onClick={() => !isFinished && handleIncrement(item.id)}
-              className={`bg-[#0a2334] rounded-xl border p-4 transition duration-300 cursor-pointer flex flex-col justify-between relative group ${
+              className={`rounded-xl border p-4 transition duration-300 cursor-pointer flex flex-col justify-between relative group ${
                 isFinished
-                  ? "border-green-600/50 bg-green-950/15"
-                  : "border-[#cca05a]/20 hover:border-[#cca05a]/50"
+                  ? darkMode ? "border-green-600/50 bg-green-950/15" : "border-green-500/30 bg-green-50/70"
+                  : darkMode 
+                  ? "bg-[#0a2334] border-[#cca05a]/20 hover:border-[#cca05a]/50" 
+                  : "bg-white border-amber-900/10 hover:border-[#cca05a]/40 shadow-sm"
               }`}
             >
               {/* Completed overlay checkmark */}
               {isFinished && (
-                <div className="absolute top-3 left-3 flex items-center space-x-1 space-x-reverse bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-500/30">
+                <div className="absolute top-3 left-3 flex items-center space-x-1 space-x-reverse bg-green-500/20 text-green-700 dark:text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-500/30">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>مكتمل</span>
                 </div>
@@ -206,49 +220,59 @@ export default function AthkarView() {
 
               {/* Text block */}
               <div className="space-y-3 mb-4 text-right">
-                <p className="text-sm font-semibold text-slate-100 leading-8 font-sans transition-all duration-300">
+                <p className={`text-sm font-semibold leading-8 font-sans transition-all duration-300 ${
+                  darkMode ? "text-slate-100" : "text-slate-900"
+                }`}>
                   {item.text}
                 </p>
 
                 {/* Reward explanation details */}
                 {item.reward && (
-                  <div className="bg-slate-950/30 p-2.5 rounded-lg border border-white/5 text-[11px] text-amber-100/70 leading-relaxed font-light">
-                    <span className="text-amber-400 font-semibold text-xs inline">فضل الذكر:</span> {item.reward}
+                  <div className={`p-2.5 rounded-lg border text-[11px] leading-relaxed font-medium ${
+                    darkMode ? "bg-slate-950/30 border-white/5 text-amber-100/80" : "bg-amber-50/60 border-amber-200/50 text-amber-950"
+                  }`}>
+                    <span className={`font-bold text-xs inline ${darkMode ? "text-amber-400" : "text-amber-900"}`}>فضل الذكر:</span> {item.reward}
                   </div>
                 )}
 
                 {/* Hadith source */}
                 {item.source && (
-                  <span className="text-[10px] text-slate-400 block font-mono">
+                  <span className={`text-[10px] block font-mono ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
                     المصدر: {item.source}
                   </span>
                 )}
               </div>
 
               {/* Interactive Counter Container */}
-              <div className="flex justify-between items-center border-t border-white/5 pt-3">
+              <div className={`flex justify-between items-center border-t pt-3 ${darkMode ? "border-white/5" : "border-slate-100"}`}>
                 <div className="flex items-center space-x-2 space-x-reverse">
                   <button
                     onClick={(e) => handleShareZikr(item, e)}
-                    className="p-1 px-2 text-[#cca05a] bg-slate-900 hover:bg-[#cca05a]/10 border border-[#cca05a]/30 hover:border-amber-400 rounded-lg text-[10px] font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer z-10"
+                    className={`p-1 px-2 rounded-lg text-[10px] font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer z-10 border ${
+                      darkMode 
+                        ? "text-[#cca05a] bg-slate-900 hover:bg-[#cca05a]/10 border-[#cca05a]/30 hover:border-amber-400" 
+                        : "text-amber-950 bg-amber-50 hover:bg-amber-100 border-amber-900/10 hover:border-amber-900/30"
+                    }`}
                     title="مشاركة الذكر"
                   >
                     <Share2 className="w-3 h-3" />
                     <span>
-                      {sharedId === item.id ? "تم النشر والنسخ!" : "مشاركة"}
+                      {sharedId === item.id ? (isAr ? "تم النسخ!" : "Copied!") : (isAr ? "مشاركة" : "Share")}
                     </span>
                   </button>
-                  <span className="text-[10px] text-[#cca05a]/60 font-light block">
+                  <span className={`text-[10px] font-medium block ${darkMode ? "text-[#cca05a]/60" : "text-amber-900/70"}`}>
                     انقر للعد
                   </span>
                 </div>
 
                 <div className="flex items-center space-x-3 space-x-reverse">
-                  <span className="text-xs text-slate-300">التكرار:</span>
+                  <span className={`text-xs ${darkMode ? "text-slate-300" : "text-slate-700"}`}>التكرار:</span>
                   <div className={`text-sm font-bold font-mono px-3.5 py-1 rounded-full text-center min-w-[70px] transition-all ${
                     isFinished
                       ? "bg-green-600 text-white"
-                      : "bg-slate-900 border border-[#cca05a]/30 text-amber-200"
+                      : darkMode
+                      ? "bg-slate-900 border border-[#cca05a]/30 text-amber-200"
+                      : "bg-amber-50 border border-amber-900/10 text-amber-950"
                   }`}>
                     {item.count} / {item.maxCount}
                   </div>
@@ -263,9 +287,13 @@ export default function AthkarView() {
       <div className="w-full max-w-sm mx-auto flex py-4 flex-none">
         <button
           onClick={handleResetSection}
-          className="w-full flex items-center justify-center space-x-2 space-x-reverse bg-[#cca05a]/10 hover:bg-[#cca05a]/20 border border-[#cca05a]/40 text-amber-100 font-bold text-xs py-2.5 rounded-xl transition cursor-pointer"
+          className={`w-full flex items-center justify-center space-x-2 space-x-reverse font-bold text-xs py-2.5 rounded-xl transition cursor-pointer border ${
+            darkMode 
+              ? "bg-[#cca05a]/10 hover:bg-[#cca05a]/20 border-[#cca05a]/40 text-amber-100" 
+              : "bg-amber-50 hover:bg-amber-100 border-amber-900/20 text-amber-950"
+          }`}
         >
-          <RotateCcw className="w-4 h-4 text-amber-400" />
+          <RotateCcw className={`w-4 h-4 ${darkMode ? "text-amber-400" : "text-amber-900"}`} />
           <span>إعادة تصفير أذكار {activeSection.title}</span>
         </button>
       </div>
