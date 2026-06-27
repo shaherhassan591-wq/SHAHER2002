@@ -80,6 +80,12 @@ jobs:
           # Update Capacitor dependencies & copy latest static web build to android project
           npx cap sync android
 
+          # Restore custom Java classes and AndroidManifest.xml that were deleted
+          echo "Restoring custom Java files and AndroidManifest.xml..."
+          mkdir -p android/app/src/main/java/com/anamuslim/app/
+          cp public/android-config/java/*.java android/app/src/main/java/com/anamuslim/app/
+          cp public/android-config/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
           # Absolute Fail-Safe: Patch the Build.VERSION_CODES.VANILLA_ICE_CREAM compilation bug in @capacitor/android
           echo "Patching Build.VERSION_CODES.VANILLA_ICE_CREAM in SystemBars.java to bypass compilation errors..."
           sed -i 's/Build.VERSION_CODES.VANILLA_ICE_CREAM/35/g' node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/plugin/SystemBars.java || echo "Sed patch failed"
