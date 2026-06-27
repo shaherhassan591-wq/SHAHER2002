@@ -27,13 +27,21 @@ declare global {
   }
 }
 
+import { Capacitor } from "@capacitor/core";
+
 export const APP_PACKAGE_ID = "com.anamuslim.app";
 
 /**
  * Check if the application is running inside a native Android wrapper
  */
 export const isNativeAndroid = (): boolean => {
-  return typeof window !== "undefined" && (!!window.Android || !!window.AndroidBridge);
+  if (typeof window === "undefined") return false;
+  try {
+    if (Capacitor.getPlatform() === "android") {
+      return true;
+    }
+  } catch (e) {}
+  return !!window.Android || !!window.AndroidBridge;
 };
 
 /**

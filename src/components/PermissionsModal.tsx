@@ -12,6 +12,7 @@ import {
   BookOpen 
 } from "lucide-react";
 import { requestLocalNotificationPermissions, isLocalNotificationsSupported } from "../utils/localNotifications";
+import { isNativeAndroid } from "../utils/androidBridge";
 
 interface PermissionsModalProps {
   onComplete: () => void;
@@ -65,23 +66,25 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
     try {
       let granted = false;
 
-      // 1. Try standard web Notifications
-      if (typeof window !== "undefined" && "Notification" in window) {
-        const res = await Notification.requestPermission();
-        if (res === "granted") {
-          granted = true;
-          setNotificationStatus("granted");
-        } else if (res === "denied") {
-          setNotificationStatus("denied");
-        }
-      }
-
-      // 2. Try Capacitor/Native local notifications if supported
-      if (isLocalNotificationsSupported()) {
+      // 1. Prioritize Capacitor/Native local notifications if on native Android
+      if (isNativeAndroid() && isLocalNotificationsSupported()) {
         const nativeGranted = await requestLocalNotificationPermissions();
         if (nativeGranted) {
           granted = true;
           setNotificationStatus("granted");
+        } else {
+          setNotificationStatus("denied");
+        }
+      } else {
+        // 2. Try standard web Notifications
+        if (typeof window !== "undefined" && "Notification" in window) {
+          const res = await Notification.requestPermission();
+          if (res === "granted") {
+            granted = true;
+            setNotificationStatus("granted");
+          } else if (res === "denied") {
+            setNotificationStatus("denied");
+          }
         }
       }
       

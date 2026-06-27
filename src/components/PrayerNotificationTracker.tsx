@@ -442,7 +442,7 @@ export default function PrayerNotificationTracker() {
     window.addEventListener("prayer-reminder-changed", handleRescheduleEvent);
 
     // Standard notification permission requests automatically when tracker loads (if not already prompted)
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+    if (!isNativeAndroid() && typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
       setTimeout(() => {
         Notification.requestPermission().catch(() => {});
       }, 8000);

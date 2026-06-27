@@ -777,6 +777,27 @@ export default function NotificationCenter() {
             )}
           </div>
         )}
+
+        {/* Native Android configuration triggers */}
+        {isNativeAndroid() && localPermission !== "granted" && (
+          <div className="pt-2 z-10 border-t border-white/5">
+            <button
+              onClick={async () => {
+                const granted = await requestLocalNotificationPermissions();
+                if (granted) {
+                  setLocalPermission("granted");
+                  triggerLocalAlert("تم تفعيل صلاحيات الإشعارات", "شكرًا لك، يمكنك الآن تلقي الأذان والتنبيهات بنجاح!", "prayer");
+                  syncAlarmsToAndroid(settings);
+                } else {
+                  triggerLocalAlert("⚠️ الصلاحية مطلوبة", "الرجاء السماح بالإشعارات في إعدادات الهاتف لتلقي الأذان في وقته.", "prayer");
+                }
+              }}
+              className="w-full bg-[#cca05a] hover:bg-amber-400 text-slate-950 font-extrabold text-xs py-2.5 px-4 rounded-xl shadow transition active:scale-95 cursor-pointer text-center"
+            >
+              🔑 تفعيل صلاحية إشعارات الأذان والأذكار بالهاتف
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 📡 OFFLINE-FIRST LOCAL NOTIFICATIONS SETTINGS CARD */}
