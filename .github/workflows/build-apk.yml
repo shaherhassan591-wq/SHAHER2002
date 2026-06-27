@@ -84,6 +84,9 @@ jobs:
           echo "Patching Build.VERSION_CODES.VANILLA_ICE_CREAM in SystemBars.java to bypass compilation errors..."
           sed -i 's/Build.VERSION_CODES.VANILLA_ICE_CREAM/35/g' node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/plugin/SystemBars.java || echo "Sed patch failed"
 
+          echo "Running setup-gradle.js to recursively patch BouncyCastle force rule in all subprojects/plugins..."
+          node setup-gradle.js
+
       # 6.5. Generate Native App Resources (Icons & Splash screens)
       - name: Generate Native App Resources
         run: |
