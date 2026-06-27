@@ -116,20 +116,9 @@ jobs:
           # Execute the resource generator to populate mipmap/drawable sizes in android module
           npx @capacitor/assets generate --android
 
-      # 7. Grant execution rights for Gradlew executable inside Android subdirectory
-      - name: Make Gradle wrapper executable & Setup Android SDK 35
-        run: |
-          chmod +x android/gradlew
-          echo "Accepting Android SDK Licenses..."
-          # Locate sdkmanager dynamically in typical runners
-          SDKMANAGER_PATH="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -f "$SDKMANAGER_PATH" ]; then
-            SDKMANAGER_PATH=$(which sdkmanager || echo "sdkmanager")
-          fi
-          echo "Using sdkmanager from: $SDKMANAGER_PATH"
-          yes | $SDKMANAGER_PATH --licenses || echo "sdkmanager licenses accept skipped"
-          echo "Installing/Updating Android SDK Platform 35 and Build Tools..."
-          $SDKMANAGER_PATH "platforms;android-35" "build-tools;35.0.0" || echo "sdkmanager install skipped"
+      # 7. Grant execution rights to Gradle Wrapper
+      - name: Grant Executable Permission to Gradlew
+        run: chmod +x android/gradlew
 
       # 8. Compile the debug APK using standard Gradle tasks
       - name: Build Android Debug APK
