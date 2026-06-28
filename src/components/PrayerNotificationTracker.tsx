@@ -36,6 +36,7 @@ export default function PrayerNotificationTracker() {
   const [isPlayingAdhan, setIsPlayingAdhan] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const checkIntervalRef = useRef<any>(null);
+  const volumeIntervalRef = useRef<any>(null);
 
   // Constant list of prayer times matching the main application
   const prayerTimes = [
@@ -180,11 +181,69 @@ export default function PrayerNotificationTracker() {
     return expanded;
   };
 
+  const startAudioWithVolumeRamp = (audio: HTMLAudioElement) => {
+    // Clear any existing active volume ramp interval
+    if (volumeIntervalRef.current) {
+      clearInterval(volumeIntervalRef.current);
+      volumeIntervalRef.current = null;
+    }
+
+    const isSmartVolume = localStorage.getItem("smart_volume_enabled") !== "false";
+    const maxVolumePct = Number(localStorage.getItem("adhan_max_volume") || "90");
+    const targetVolume = maxVolumePct / 100;
+
+    if (!isSmartVolume) {
+      audio.volume = targetVolume;
+      return;
+    }
+
+    // Smart Volume: gradual increase from 0 to target volume over 15 seconds
+    audio.volume = 0;
+    
+    const rampDurationMs = 15000; // 15 seconds ramp
+    const intervalMs = 250; // Update every quarter second
+    const steps = rampDurationMs / intervalMs;
+    const volumeStep = targetVolume / steps;
+
+    let currentStep = 0;
+    const intervalId = setInterval(() => {
+      if (!audio || audio.paused || audio.ended) {
+        clearInterval(intervalId);
+        if (volumeIntervalRef.current === intervalId) {
+          volumeIntervalRef.current = null;
+        }
+        return;
+      }
+      
+      currentStep++;
+      const nextVolume = Math.min(targetVolume, currentStep * volumeStep);
+      audio.volume = nextVolume;
+
+      if (nextVolume >= targetVolume) {
+        clearInterval(intervalId);
+        if (volumeIntervalRef.current === intervalId) {
+          volumeIntervalRef.current = null;
+        }
+      }
+    }, intervalMs);
+
+    volumeIntervalRef.current = intervalId;
+  };
+
   const playAdhanAudio = (voiceId: string) => {
-    // 1. Silent mode check
+    // 1. Silent mode and DND check
     if (localStorage.getItem("silent_mode") === "true") {
       console.log("[PrayerNotificationTracker] Silent mode active. Audio play skipped.");
       return;
+    }
+    if (localStorage.getItem("dnd_mode") === "true") {
+      console.log("[PrayerNotificationTracker] Do Not Disturb active. Adhan audio play skipped.");
+      return;
+    }
+
+    if (volumeIntervalRef.current) {
+      clearInterval(volumeIntervalRef.current);
+      volumeIntervalRef.current = null;
     }
 
     if (audioRef.current) {
@@ -204,7 +263,9 @@ export default function PrayerNotificationTracker() {
       const activeUrl = urls[index];
       const audio = new Audio(activeUrl);
       audioRef.current = audio;
-      audio.volume = 0.9;
+      
+      // Start with smart volume ramp
+      startAudioWithVolumeRamp(audio);
 
       audio.play()
         .then(() => {
@@ -231,7 +292,10 @@ export default function PrayerNotificationTracker() {
           console.log(`[PrayerNotificationTracker] Playing offline cached Adhan for ${voiceId}!`);
           const audio = new Audio(localUrl);
           audioRef.current = audio;
-          audio.volume = 0.9;
+          
+          // Start with smart volume ramp
+          startAudioWithVolumeRamp(audio);
+
           audio.play()
             .then(() => {
               setIsPlayingAdhan(true);
@@ -270,6 +334,10 @@ export default function PrayerNotificationTracker() {
   };
 
   const stopAdhan = () => {
+    if (volumeIntervalRef.current) {
+      clearInterval(volumeIntervalRef.current);
+      volumeIntervalRef.current = null;
+    }
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -320,21 +388,26 @@ export default function PrayerNotificationTracker() {
             const voiceId = prayerSetting?.adhanVoiceId || "makkah";
             const muadhinName = getMuadhinName(voiceId);
 
-            // Display in-app gorgeous banner alert
-            setActiveAlert({
-              prayerId: matchedPrayer.id,
-              prayerName: matchedPrayer.name,
-              muadhinName,
-              time: matchedPrayer.time
-            });
+            // Skip all UI alerts, OS notifications, and Adhan audio when Do Not Disturb is active
+            if (localStorage.getItem("dnd_mode") !== "true") {
+              // Display in-app gorgeous banner alert
+              setActiveAlert({
+                prayerId: matchedPrayer.id,
+                prayerName: matchedPrayer.name,
+                muadhinName,
+                time: matchedPrayer.time
+              });
 
-            // Trigger OS Notification
-            const msgTitle = `🕌 حان الآن موعد نداء صلاة ${matchedPrayer.name}`;
-            const msgBody = `الله أكبر، الله أكبر.. نداء الحق لـ صلاة ${matchedPrayer.name} بتوقيتك المحلي بصوت (${muadhinName}). أقم صلاتك تسعد حياتك.`;
-            triggerSystemNotification(msgTitle, msgBody);
+              // Trigger OS Notification
+              const msgTitle = `🕌 حان الآن موعد نداء صلاة ${matchedPrayer.name}`;
+              const msgBody = `الله أكبر، الله أكبر.. نداء الحق لـ صلاة ${matchedPrayer.name} بتوقيتك المحلي بصوت (${muadhinName}). أقم صلاتك تسعد حياتك.`;
+              triggerSystemNotification(msgTitle, msgBody);
 
-            // Play the Adhan Audio!
-            playAdhanAudio(voiceId);
+              // Play the Adhan Audio!
+              playAdhanAudio(voiceId);
+            } else {
+              console.log(`[PrayerNotificationTracker] DND active. Skipped alerting for ${matchedPrayer.name} at ${matchedPrayer.time}`);
+            }
           }
         }
       }
@@ -363,13 +436,18 @@ export default function PrayerNotificationTracker() {
             if (!prayerSetting || prayerSetting.enabled) {
               localStorage.setItem(prepKey, "true");
 
-              // Play gentle notification chime
-              playQuietChime("gentle");
+              // Skip pre-prayer warnings if DND mode is active
+              if (localStorage.getItem("dnd_mode") !== "true") {
+                // Play gentle notification chime
+                playQuietChime("gentle");
 
-              // Trigger OS Notification
-              const prepTitle = `🔔 اقترب موعد صلاة ${incomingPrayer.name} (بقي ${toArabicNumerals(prepTime)} دقائق)`;
-              const prepBody = `أخي الكريم، شارف وقت صلاة ${incomingPrayer.name} على الدخول. استعد وتوضأ لملاقاة الرحمن واللحاق بتكبيرة الإحرام.`;
-              triggerSystemNotification(prepTitle, prepBody);
+                // Trigger OS Notification
+                const prepTitle = `🔔 اقترب موعد صلاة ${incomingPrayer.name} (بقي ${toArabicNumerals(prepTime)} دقائق)`;
+                const prepBody = `أخي الكريم، شارف وقت صلاة ${incomingPrayer.name} على الدخول. استعد وتوضأ لملاقاة الرحمن واللحاق بتكبيرة الإحرام.`;
+                triggerSystemNotification(prepTitle, prepBody);
+              } else {
+                console.log(`[PrayerNotificationTracker] DND active. Skipped pre-prayer warning for ${incomingPrayer.name}`);
+              }
             }
           }
         }
@@ -451,6 +529,9 @@ export default function PrayerNotificationTracker() {
     return () => {
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current);
+      }
+      if (volumeIntervalRef.current) {
+        clearInterval(volumeIntervalRef.current);
       }
       if (audioRef.current) {
         audioRef.current.pause();

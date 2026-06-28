@@ -52,10 +52,18 @@ public class AlarmReceiver extends BroadcastReceiver {
             );
 
             // 3. Build notification (Max Importance, Heads-up popup)
+            String title = "🕌 حان الآن موعد صلاة " + prayerName;
+            String text = "الله أكبر، الله أكبر.. نداء الحق لصلاة " + prayerName + " بتوقيتك المحلي.";
+
+            if (prayerName != null && (prayerName.contains("النبي") || prayerName.contains("الصلاة") || prayerName.contains("الذكر") || prayerName.contains("صلى"))) {
+                title = "💚 تذكير بالصلاة على النبي ﷺ";
+                text = "اللهم صلِّ وسلِّم وبارك على نبينا محمد وعلى آله وصحبه أجمعين.";
+            }
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("🕌 حان الآن موعد صلاة " + prayerName)
-                    .setContentText("الله أكبر، الله أكبر.. نداء الحق لصلاة " + prayerName + " بتوقيتك المحلي.")
+                    .setContentTitle(title)
+                    .setContentText(text)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_ALARM)
                     .setContentIntent(pendingIntent)
@@ -112,7 +120,50 @@ public class AlarmReceiver extends BroadcastReceiver {
             alarmMediaPlayer.start();
             Log.d(TAG, "Playing native adhan audio file: " + assetPath);
         } catch (Exception e) {
-            Log.e(TAG, "Could not play native adhan audio, playing default system alarm sound.", e);
+            Log.e(TAG, "Could not play native adhan audio, trying online fallbacks...", e);
+            
+            String onlineUrl = null;
+            if (voiceId != null) {
+                if (voiceId.startsWith("http")) {
+                    onlineUrl = voiceId;
+                } else if (voiceId.equals("makkah")) {
+                    onlineUrl = "https://dn710002.ca.archive.org/0/items/90---azan---90---azan--many----sound----mp3---alazan_662/019--1.mp3";
+                } else if (voiceId.equals("abdulbasit")) {
+                    onlineUrl = "https://ia600100.us.archive.org/34/items/90---azan---90---azan--many----sound----mp3---alazan_662/041--.mp3";
+                } else if (voiceId.equals("afasy")) {
+                    onlineUrl = "https://dn710002.ca.archive.org/0/items/90---azan---90---azan--many----sound----mp3---alazan_662/038-1.mp3";
+                } else if (voiceId.equals("aqsa")) {
+                    onlineUrl = "https://dn710002.ca.archive.org/0/items/90---azan---90---azan--many----sound----mp3---alazan_662/045--.mp3";
+                } else if (voiceId.equals("makkah_2")) {
+                    onlineUrl = "https://dn710603.ca.archive.org/0/items/90---azan---90---azan--many----sound----mp3---alazan/019--1.mp3";
+                } else if (voiceId.contains("prophet") || voiceId.equals("real_prophet")) {
+                    onlineUrl = "https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3";
+                } else if (voiceId.equals("pre_reminder")) {
+                    onlineUrl = "https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3";
+                }
+            }
+            
+            if (onlineUrl != null) {
+                try {
+                    alarmMediaPlayer.release();
+                    alarmMediaPlayer = new MediaPlayer();
+                    alarmMediaPlayer.setDataSource(onlineUrl);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        alarmMediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build());
+                    }
+                    alarmMediaPlayer.setVolume(1.0f, 1.0f);
+                    alarmMediaPlayer.prepare();
+                    alarmMediaPlayer.start();
+                    Log.d(TAG, "Playing online fallback audio URL: " + onlineUrl);
+                    return;
+                } catch (Exception ex) {
+                    Log.e(TAG, "Failed to play online fallback audio", ex);
+                }
+            }
+
             // Play default system ringtone/notification as fallback
             try {
                 alarmMediaPlayer.release();

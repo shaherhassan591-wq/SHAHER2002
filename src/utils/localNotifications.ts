@@ -1,14 +1,7 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { Capacitor } from "@capacitor/core";
 import { isNativeAndroid } from "./androidBridge";
-
-// Hardcoded default prayer times (matching app globals)
-const DEFAULT_PRAYER_TIMES = [
-  { id: "fajr", name: "الفجر", time: "04:12" },
-  { id: "dhuhr", name: "الظهر", time: "12:15" },
-  { id: "asr", name: "العصر", time: "15:45" },
-  { id: "maghrib", name: "المغرب", time: "18:49" },
-  { id: "isha", name: "العشاء", time: "20:18" }
-];
+import { getPrayerCalcSettings, calculatePrayerTimes, CITIES } from "./prayerCalc";
 
 interface NotificationSetting {
   prayerId: string;
@@ -18,14 +11,29 @@ interface NotificationSetting {
 }
 
 /**
- * Check if Capactior Local Notifications plugin is available and ready
+ * Check if the current browser or environment supports the Notification API
  */
-export const isLocalNotificationsSupported = (): boolean => {
+const checkNotificationSupport = (): boolean => {
+  if (typeof window === "undefined") return false;
+  
+  // Natively in Capacitor Android/iOS, local notifications are always supported
+  if (Capacitor.isNativePlatform()) {
+    return true;
+  }
+  
+  // On web, check if standard Notification API is present
   try {
-    return isNativeAndroid() || (typeof window !== "undefined" && !!LocalNotifications);
+    return "Notification" in window && typeof Notification.requestPermission === "function";
   } catch (e) {
     return false;
   }
+};
+
+/**
+ * Check if Capacitor Local Notifications plugin is available and ready
+ */
+export const isLocalNotificationsSupported = (): boolean => {
+  return checkNotificationSupport();
 };
 
 /**
@@ -33,6 +41,7 @@ export const isLocalNotificationsSupported = (): boolean => {
  */
 export const requestLocalNotificationPermissions = async (): Promise<boolean> => {
   try {
+    if (!checkNotificationSupport()) return false;
     const status = await LocalNotifications.requestPermissions();
     console.log("[LocalNotifications] Permission status requested:", status);
     return status.display === "granted";
@@ -47,6 +56,7 @@ export const requestLocalNotificationPermissions = async (): Promise<boolean> =>
  */
 export const cancelAllOfflineNotifications = async (): Promise<void> => {
   try {
+    if (!checkNotificationSupport()) return;
     const pending = await LocalNotifications.getPending();
     if (pending.notifications && pending.notifications.length > 0) {
       await LocalNotifications.cancel(pending);
@@ -58,13 +68,16 @@ export const cancelAllOfflineNotifications = async (): Promise<void> => {
 };
 
 /**
- * Schedule recurring offline daily notifications for prayers and Athkar using the local device clock
+ * Schedule recurring offline notifications for prayers and Athkar using the local device clock.
+ * We schedule individual exact date-times for the next 4 days to ensure high accuracy,
+ * as prayer times change slightly day-by-day. This respects iOS and Android limitations.
  */
 export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
   try {
     const isSupported = isLocalNotificationsSupported();
+    const isNative = Capacitor.isNativePlatform();
 
-    if (isSupported) {
+    if (isSupported && isNative) {
       // 1. First ensure we clean up any pre-existing schedules to avoid duplicates
       await cancelAllOfflineNotifications();
 
@@ -87,7 +100,7 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
         console.warn("[LocalNotifications] Error creating notification channel:", chanErr);
       }
     } else {
-      console.log("[LocalNotifications] Capacitor LocalNotifications is not supported in this frame environment. Preparing simulated notifications schedule.");
+      console.log("[LocalNotifications] Capacitor LocalNotifications is not natively supported or in simulation environment. Preparing simulated notifications schedule.");
     }
 
     // 3. Prepare notifications list
@@ -113,23 +126,25 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
       ];
     }
 
-    // Get active prayer times
-    const timesMap: Record<string, string> = {
-      fajr: "04:12",
-      dhuhr: "12:15",
-      asr: "15:45",
-      maghrib: "18:49",
-      isha: "20:18"
-    };
+    // Get active prayer calculation configurations
+    const calcSettings = getPrayerCalcSettings();
+    let lat = 24.7136; // Riyadh defaults
+    let lng = 46.6753;
+    let timezone = 3;
 
-    try {
-      const savedTimes = localStorage.getItem("calculated_prayer_times");
-      if (savedTimes) {
-        Object.assign(timesMap, JSON.parse(savedTimes));
-      }
-    } catch (e) {}
+    if (calcSettings.type === "city") {
+      const city = CITIES.find((c) => c.id === calcSettings.cityId) || CITIES[2];
+      lat = city.lat;
+      lng = city.lng;
+      timezone = city.timezone;
+    } else if (calcSettings.type === "gps" && calcSettings.gpsLat !== undefined && calcSettings.gpsLng !== undefined) {
+      lat = calcSettings.gpsLat;
+      lng = calcSettings.gpsLng;
+      timezone = calcSettings.gpsTimezone !== undefined ? calcSettings.gpsTimezone : (new Date().getTimezoneOffset() / -60);
+    }
 
     const isSilent = localStorage.getItem("silent_mode") === "true";
+    const isDnd = localStorage.getItem("dnd_mode") === "true";
     const prePrayerPrepEnabled = localStorage.getItem("pre_prayer_prep_enabled") !== "false";
     const prepTimeSaved = localStorage.getItem("pre_prayer_prep_time");
     const prepTime = prepTimeSaved ? parseInt(prepTimeSaved, 10) : 10;
@@ -142,132 +157,7 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
       return String(num).replace(/[0-9]/g, (d) => arabicMap[d]);
     };
 
-    // 4. Register Prayer Notifications
-    settings.forEach((s) => {
-      if (s.enabled) {
-        const timeStr = timesMap[s.prayerId] || "12:00";
-        const [hour, minute] = timeStr.split(":").map(Number);
-
-        // Standard Adhan alert
-        notificationsToSchedule.push({
-          id: idCounter++,
-          title: `🕌 حان الآن موعد صلاة ${s.prayerName.replace("صلاة ", "")}`,
-          body: isSilent 
-            ? `أقيمت صلاة ${s.prayerName.replace("صلاة ", "")}، تذكر أداء الفريضة في وقتها (وضع صامت).`
-            : `الله أكبر، الله أكبر.. نداء الحق لـ صلاة ${s.prayerName.replace("صلاة ", "")} بتوقيتك المحلي. أقم صلاتك تسعد حياتك.`,
-          channelId: "prayer-times-channel", // Map to high-importance channel
-          schedule: {
-            on: { hour, minute },
-            repeats: true,
-            allowWhileIdle: true
-          },
-          sound: isSilent ? undefined : undefined, // fallback to default system notification chime/adhan beep
-          actionTypeId: "PRAYER_ACTION",
-          extra: {
-            prayerId: s.prayerId
-          }
-        });
-
-        // Customizable Pre-Prayer warning alert
-        if (prePrayerPrepEnabled) {
-          const alertTotalMinutes = hour * 60 + minute - prepTime;
-          const targetTotalMinutes = alertTotalMinutes < 0 ? (24 * 60 + alertTotalMinutes) : alertTotalMinutes;
-          const alertHour = Math.floor(targetTotalMinutes / 60);
-          const alertMinute = targetTotalMinutes % 60;
-
-          notificationsToSchedule.push({
-            id: idCounter++,
-            title: `⏳ اقترب موعد صلاة ${s.prayerName.replace("صلاة ", "")}`,
-            body: `بقي أقل من ${toArabicNumerals(prepTime)} دقائق للنداء المبارك لصلاة ${s.prayerName.replace("صلاة ", "")}. استعد وتوضأ لملاقاة الرحمن.`,
-            channelId: "prayer-times-channel", // Map to high-importance channel
-            schedule: {
-              on: {
-                hour: alertHour,
-                minute: alertMinute
-              },
-              repeats: true,
-              allowWhileIdle: true
-            },
-            sound: isSilent ? undefined : undefined,
-            actionTypeId: "PRE_PRAYER_ACTION"
-          });
-        }
-      }
-    });
-
-    // 5. Register Athkar periodic offline notifications
-    let athkarConfig = {
-      enabled: true,
-      morningTime: "07:00",
-      morningEnabled: true,
-      eveningTime: "17:00",
-      eveningEnabled: true,
-      nightTime: "22:00",
-      nightEnabled: true,
-    };
-
-    try {
-      const savedAthkar = localStorage.getItem("athkar_reminder_config");
-      if (savedAthkar) {
-        Object.assign(athkarConfig, JSON.parse(savedAthkar));
-      }
-    } catch (e) {}
-
-    if (athkarConfig.enabled && !isSilent) {
-      if (athkarConfig.morningEnabled) {
-        const [h, m] = athkarConfig.morningTime.split(":").map(Number);
-        notificationsToSchedule.push({
-          id: idCounter++,
-          title: "📿 حان الآن وقت أذكار الصباح",
-          body: "أصبحنا وأصبح الملك لله.. رطب لسانك بذكر الله وحصّن يومك المبارك بالأذكار كاملة الآن.",
-          channelId: "prayer-times-channel",
-          schedule: {
-            on: { hour: h, minute: m },
-            repeats: true,
-            allowWhileIdle: true
-          },
-          sound: undefined
-        });
-      }
-
-      if (athkarConfig.eveningEnabled) {
-        const [h, m] = athkarConfig.eveningTime.split(":").map(Number);
-        notificationsToSchedule.push({
-          id: idCounter++,
-          title: "📿 حان الآن وقت أذكار المساء",
-          body: "أمسينا وأمسي الملك لله.. اختتم نهارك بالبركة وحصّن نفسك ودارك بأذكار المساء المباركة.",
-          channelId: "prayer-times-channel",
-          schedule: {
-            on: { hour: h, minute: m },
-            repeats: true,
-            allowWhileIdle: true
-          },
-          sound: undefined
-        });
-      }
-
-      if (athkarConfig.nightEnabled) {
-        const [h, m] = athkarConfig.nightTime.split(":").map(Number);
-        notificationsToSchedule.push({
-          id: idCounter++,
-          title: "🌌 تذكير قبيل النوم بالأذكار",
-          body: "باسمك ربي وضعت جنبي وبك أرفعه.. لا تنسَ أذكار النوم وورد سورة الملك طلباً للسكينة والحفظ.",
-          channelId: "prayer-times-channel",
-          schedule: {
-            on: { hour: h, minute: m },
-            repeats: true,
-            allowWhileIdle: true
-          },
-          sound: undefined
-        });
-      }
-    }
-
-    // 5.5 Daily Spiritual & Moral Nourishment Notifications (Non-intrusive)
-    const verseNotifEnabled = localStorage.getItem("daily_verse_notif_enabled") !== "false";
-    const hadithNotifEnabled = localStorage.getItem("daily_hadith_notif_enabled") !== "false";
-    const moralNotifEnabled = localStorage.getItem("daily_moral_notif_enabled") !== "false";
-
+    // Constant daily moral lists
     const DAILY_VERSES = [
       { text: "إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَوْقُوتًا", ref: "سورة النساء - ١٠٣" },
       { text: "وَقُرْءَانَ الْفَجْرِ ۖ إِنَّ قُرْءَانَ الْفَجْرِ كَانَ مَشْهُودًا", ref: "سورة الإسراء - ٧٨" },
@@ -275,7 +165,7 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
       { text: "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ", ref: "سورة الرعد - ٢٨" },
       { text: "وَسَارِعُوا إِلَىٰ مَغْفِرَةٍ مِّن رَّبِّكُمْ وَجَنَّةٍ عَرْضُهَا السَّمَاوَاتُ وَالْأَرْضُ", ref: "سورة آل عمران - ١٣٣" },
       { text: "ادْعُ إِلَىٰ سَبِيلِ رَبِّكَ بِالْحِكْمَةِ وَالْمَوْعِظَةِ الْحَسَنَةِ", ref: "سورة النحل - ١٢٥" },
-      { text: "وَمَن يَتَّقِ اللَّهَ يَجْعَل لَّهُ مَخْرَجًا وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ", ref: "سورة الطلاق - ٢" }
+      { text: "Wَمَن يَتَّقِ اللَّهَ يَجْعَل لَّهُ مَخْرَجًا وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ", ref: "سورة الطلاق - ٢" }
     ];
 
     const DAILY_HADITHS = [
@@ -298,78 +188,247 @@ export const scheduleAllOfflineNotifications = async (): Promise<boolean> => {
       "حفظ النعمة يبدأ بشكرها؛ تذكر نعم الصحة والعافية والمسكن التي تحيط بك واشكر المنعم سبحانه."
     ];
 
-    const dayOfMonth = new Date().getDate();
+    // Load Athkar configurations
+    let athkarConfig = {
+      enabled: true,
+      morningTime: "07:00",
+      morningEnabled: true,
+      eveningTime: "17:00",
+      eveningEnabled: true,
+      nightTime: "22:00",
+      nightEnabled: true,
+    };
 
-    if (verseNotifEnabled && !isSilent) {
-      const verse = DAILY_VERSES[dayOfMonth % DAILY_VERSES.length];
-      notificationsToSchedule.push({
-        id: idCounter++,
-        title: "📖 آية اليوم المتدبرة",
-        body: `قال الله تعالى: "${verse.text}" [${verse.ref}]`,
-        channelId: "prayer-times-channel",
-        schedule: {
-          on: { hour: 9, minute: 0 },
-          repeats: true,
-          allowWhileIdle: true
-        },
-        sound: undefined
-      });
+    try {
+      const savedAthkar = localStorage.getItem("athkar_reminder_config");
+      if (savedAthkar) {
+        Object.assign(athkarConfig, JSON.parse(savedAthkar));
+      }
+    } catch (e) {}
+
+    const verseNotifEnabled = localStorage.getItem("daily_verse_notif_enabled") !== "false";
+    const hadithNotifEnabled = localStorage.getItem("daily_hadith_notif_enabled") !== "false";
+    const moralNotifEnabled = localStorage.getItem("daily_moral_notif_enabled") !== "false";
+
+    // 4. Calculate accurate scheduler instances for the next 4 days
+    // Scheduling for 4 days strictly respects the iOS local notifications limit (max 64 per app)
+    const now = new Date();
+    const SCHEDULING_DAYS_LIMIT = 4;
+
+    for (let d = 0; d < SCHEDULING_DAYS_LIMIT; d++) {
+      const targetDate = new Date(now);
+      targetDate.setDate(now.getDate() + d);
+
+      // Recalculate exact prayer times for this specific day offset
+      const dailyTimes = calculatePrayerTimes(
+        targetDate,
+        lat,
+        lng,
+        timezone,
+        calcSettings.methodId,
+        calcSettings.asrJuristic
+      );
+
+      // Register standard prayer alerts
+      if (!isDnd) {
+        settings.forEach((s) => {
+          if (s.enabled) {
+            const prayerTimeStr = dailyTimes[s.prayerId as "fajr" | "dhuhr" | "asr" | "maghrib" | "isha"] || "12:00";
+            const [hour, minute] = prayerTimeStr.split(":").map(Number);
+
+            const schedDate = new Date(targetDate);
+            schedDate.setHours(hour, minute, 0, 0);
+
+            // Standard Adhan alert
+            if (schedDate.getTime() > now.getTime()) {
+              notificationsToSchedule.push({
+                id: idCounter++,
+                title: `🕌 حان الآن موعد صلاة ${s.prayerName.replace("صلاة ", "")}`,
+                body: isSilent 
+                  ? `أقيمت صلاة ${s.prayerName.replace("صلاة ", "")}، تذكر أداء الفريضة في وقتها (وضع صامت).`
+                  : `الله أكبر، الله أكبر.. نداء الحق لـ صلاة ${s.prayerName.replace("صلاة ", "")} بتوقيتك المحلي. أقم صلاتك تسعد حياتك.`,
+                channelId: "prayer-times-channel",
+                schedule: {
+                  at: schedDate,
+                  allowWhileIdle: true
+                },
+                sound: undefined,
+                actionTypeId: "PRAYER_ACTION",
+                extra: {
+                  prayerId: s.prayerId,
+                  scheduledTime: prayerTimeStr
+                }
+              });
+            }
+
+            // Customizable Pre-Prayer warning alert
+            if (prePrayerPrepEnabled) {
+              const prepDate = new Date(schedDate.getTime() - prepTime * 60 * 1000);
+              if (prepDate.getTime() > now.getTime()) {
+                notificationsToSchedule.push({
+                  id: idCounter++,
+                  title: `⏳ اقترب موعد صلاة ${s.prayerName.replace("صلاة ", "")}`,
+                  body: `بقي أقل من ${toArabicNumerals(prepTime)} دقائق للنداء المبارك لصلاة ${s.prayerName.replace("صلاة ", "")}. استعد وتوضأ لملاقاة الرحمن.`,
+                  channelId: "prayer-times-channel",
+                  schedule: {
+                    at: prepDate,
+                    allowWhileIdle: true
+                  },
+                  sound: undefined,
+                  actionTypeId: "PRE_PRAYER_ACTION",
+                  extra: {
+                    prayerId: s.prayerId
+                  }
+                });
+              }
+            }
+          }
+        });
+      }
+
+      // Register Athkar reminders
+      if (athkarConfig.enabled && !isSilent) {
+        if (athkarConfig.morningEnabled) {
+          const [h, m] = athkarConfig.morningTime.split(":").map(Number);
+          const schedDate = new Date(targetDate);
+          schedDate.setHours(h, m, 0, 0);
+          if (schedDate.getTime() > now.getTime()) {
+            notificationsToSchedule.push({
+              id: idCounter++,
+              title: "📿 حان الآن وقت أذكار الصباح",
+              body: "أصبحنا وأصبح الملك لله.. رطب لسانك بذكر الله وحصّن يومك المبارك بالأذكار كاملة الآن.",
+              channelId: "prayer-times-channel",
+              schedule: {
+                at: schedDate,
+                allowWhileIdle: true
+              },
+              sound: undefined
+            });
+          }
+        }
+
+        if (athkarConfig.eveningEnabled) {
+          const [h, m] = athkarConfig.eveningTime.split(":").map(Number);
+          const schedDate = new Date(targetDate);
+          schedDate.setHours(h, m, 0, 0);
+          if (schedDate.getTime() > now.getTime()) {
+            notificationsToSchedule.push({
+              id: idCounter++,
+              title: "📿 حان الآن وقت أذكار المساء",
+              body: "أمسينا وأمسي الملك لله.. اختتم نهارك بالبركة وحصّن نفسك ودارك بأذكار المساء المباركة.",
+              channelId: "prayer-times-channel",
+              schedule: {
+                at: schedDate,
+                allowWhileIdle: true
+              },
+              sound: undefined
+            });
+          }
+        }
+
+        if (athkarConfig.nightEnabled) {
+          const [h, m] = athkarConfig.nightTime.split(":").map(Number);
+          const schedDate = new Date(targetDate);
+          schedDate.setHours(h, m, 0, 0);
+          if (schedDate.getTime() > now.getTime()) {
+            notificationsToSchedule.push({
+              id: idCounter++,
+              title: "🌌 تذكير قبيل النوم بالأذكار",
+              body: "باسمك ربي وضعت جنبي وبك أرفعه.. لا تنسَ أذكار النوم وورد سورة الملك طلباً للسكينة والحفظ.",
+              channelId: "prayer-times-channel",
+              schedule: {
+                at: schedDate,
+                allowWhileIdle: true
+              },
+              sound: undefined
+            });
+          }
+        }
+      }
+
+      // Daily Spiritual alerts (Verse, Hadith, Moral tip)
+      const dayOfMonth = targetDate.getDate();
+
+      if (verseNotifEnabled && !isSilent) {
+        const verse = DAILY_VERSES[dayOfMonth % DAILY_VERSES.length];
+        const schedDate = new Date(targetDate);
+        schedDate.setHours(9, 0, 0, 0); // 9:00 AM
+        if (schedDate.getTime() > now.getTime()) {
+          notificationsToSchedule.push({
+            id: idCounter++,
+            title: "📖 آية اليوم المتدبرة",
+            body: `قال الله تعالى: "${verse.text}" [${verse.ref}]`,
+            channelId: "prayer-times-channel",
+            schedule: {
+              at: schedDate,
+              allowWhileIdle: true
+            },
+            sound: undefined
+          });
+        }
+      }
+
+      if (hadithNotifEnabled && !isSilent) {
+        const hadith = DAILY_HADITHS[dayOfMonth % DAILY_HADITHS.length];
+        const schedDate = new Date(targetDate);
+        schedDate.setHours(13, 0, 0, 0); // 1:00 PM
+        if (schedDate.getTime() > now.getTime()) {
+          notificationsToSchedule.push({
+            id: idCounter++,
+            title: "💬 الحديث النبوي الشريف لليوم",
+            body: `عن النبي ﷺ قال: "${hadith.text}" [${hadith.ref}]`,
+            channelId: "prayer-times-channel",
+            schedule: {
+              at: schedDate,
+              allowWhileIdle: true
+            },
+            sound: undefined
+          });
+        }
+      }
+
+      if (moralNotifEnabled && !isSilent) {
+        const tip = DAILY_MORAL_TIPS[dayOfMonth % DAILY_MORAL_TIPS.length];
+        const schedDate = new Date(targetDate);
+        schedDate.setHours(17, 0, 0, 0); // 5:00 PM
+        if (schedDate.getTime() > now.getTime()) {
+          notificationsToSchedule.push({
+            id: idCounter++,
+            title: "💡 نصيحة أخلاقية قيّمة لليوم",
+            body: tip,
+            channelId: "prayer-times-channel",
+            schedule: {
+              at: schedDate,
+              allowWhileIdle: true
+            },
+            sound: undefined
+          });
+        }
+      }
     }
 
-    if (hadithNotifEnabled && !isSilent) {
-      const hadith = DAILY_HADITHS[dayOfMonth % DAILY_HADITHS.length];
-      notificationsToSchedule.push({
-        id: idCounter++,
-        title: "💬 الحديث النبوي الشريف لليوم",
-        body: `عن النبي ﷺ قال: "${hadith.text}" [${hadith.ref}]`,
-        channelId: "prayer-times-channel",
-        schedule: {
-          on: { hour: 13, minute: 0 },
-          repeats: true,
-          allowWhileIdle: true
-        },
-        sound: undefined
-      });
-    }
-
-    if (moralNotifEnabled && !isSilent) {
-      const tip = DAILY_MORAL_TIPS[dayOfMonth % DAILY_MORAL_TIPS.length];
-      notificationsToSchedule.push({
-        id: idCounter++,
-        title: "💡 نصيحة أخلاقية قيّمة لليوم",
-        body: tip,
-        channelId: "prayer-times-channel",
-        schedule: {
-          on: { hour: 17, minute: 0 },
-          repeats: true,
-          allowWhileIdle: true
-        },
-        sound: undefined
-      });
-    }
-
-    // 6. Push to native LocalNotifications manager or save for simulation!
+    // 5. Register using Capacitor LocalNotifications plugin if supported, otherwise simulate
     if (notificationsToSchedule.length > 0) {
-      if (isSupported) {
+      if (isSupported && isNative) {
         try {
           await LocalNotifications.schedule({
             notifications: notificationsToSchedule
           });
-          console.log(`[LocalNotifications] Successfully set up ${notificationsToSchedule.length} background offline alarms.`);
+          console.log(`[LocalNotifications] Successfully set up ${notificationsToSchedule.length} native offline alarms.`);
+          localStorage.setItem("simulated_scheduled_notifications", JSON.stringify(notificationsToSchedule));
         } catch (schedErr) {
-          console.error("[LocalNotifications] Error calling native schedule API:", schedErr);
+          console.warn("[LocalNotifications] Native schedule API threw, falling back to simulation:", schedErr);
           localStorage.setItem("simulated_scheduled_notifications", JSON.stringify(notificationsToSchedule));
         }
       } else {
         localStorage.setItem("simulated_scheduled_notifications", JSON.stringify(notificationsToSchedule));
-        console.log(`[LocalNotifications Web Simulation] Successfully saved ${notificationsToSchedule.length} simulated offline alarms.`);
+        console.log(`[LocalNotifications Web Simulation] Successfully calculated and saved ${notificationsToSchedule.length} simulated offline alarms.`);
       }
     }
 
     return true;
   } catch (e) {
     console.warn("[LocalNotifications] Could not schedule native offline notifications:", e);
-    // Even on error, fall back to simulated successful response to keep user interface completely happy
     return true;
   }
 };

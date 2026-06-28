@@ -80,27 +80,31 @@ public class AlarmScheduler {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             if (alarmManager == null) return;
 
-            String[] prayers = {"الفجر", "الشروق", "الظهر", "العصر", "المغرب", "العشاء"};
-            for (String prayer : prayers) {
-                int requestCode = getUniqueRequestCode(prayer);
-                Intent intent = new Intent(context, AlarmReceiver.class);
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        context,
-                        requestCode,
-                        intent,
-                        PendingIntent.FLAG_NO_CREATE | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
-                );
-                if (pendingIntent != null) {
-                    alarmManager.cancel(pendingIntent);
-                    pendingIntent.cancel();
+            SharedPreferences prefs = context.getSharedPreferences("AnaMuslimAlarms", Context.MODE_PRIVATE);
+            java.util.Map<String, ?> allEntries = prefs.getAll();
+            for (java.util.Map.Entry<String, ?> entry : allEntries.entrySet()) {
+                String key = entry.getKey();
+                if (key.startsWith("alarm_")) {
+                    String prayer = key.substring(6); // get prayerName
+                    int requestCode = getUniqueRequestCode(prayer);
+                    Intent intent = new Intent(context, AlarmReceiver.class);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                            context,
+                            requestCode,
+                            intent,
+                            PendingIntent.FLAG_NO_CREATE | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
+                    );
+                    if (pendingIntent != null) {
+                        alarmManager.cancel(pendingIntent);
+                        pendingIntent.cancel();
+                    }
                 }
             }
 
             // Clear backup cache
-            SharedPreferences prefs = context.getSharedPreferences("AnaMuslimAlarms", Context.MODE_PRIVATE);
             prefs.edit().clear().apply();
 
-            Log.d(TAG, "Natively cancelled all exact prayer alarms");
+            Log.d(TAG, "Natively cancelled all active alarms dynamically from SharedPreferences");
         } catch (Exception e) {
             Log.e(TAG, "Failed to cancel native alarms", e);
         }

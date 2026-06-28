@@ -2,28 +2,28 @@
   "id": "com.anamuslim.app",
   "short_name": "أنا مسلم",
   "name": "أنا مسلم - الحقيبة الروحية والمنهاج اليومي",
-  "description": "حقيبة المسلم الشاملة لأذكار الصباح والمساء والقرآن الكريم والتقويم الهجري والصلوات والورد اليومي وما إلى ذلك.",
+  "description": "حقيبة المسلم الشاملة لأذكار الصباح والمساء والقرآن الكريم والتقويم الهجري والصلوات والورد اليومي.",
   "icons": [
     {
-      "src": "https://cdn.phototourl.com/free/2026-06-27-cf33f7fb-4fc0-4446-a575-67adb816986d.png",
+      "src": "/icon.png?v=3",
       "type": "image/png",
       "sizes": "1024x1024",
       "purpose": "any"
     },
     {
-      "src": "https://cdn.phototourl.com/free/2026-06-27-cf33f7fb-4fc0-4446-a575-67adb816986d.png",
+      "src": "/icon.png?v=3",
       "type": "image/png",
       "sizes": "1024x1024",
       "purpose": "maskable"
     },
     {
-      "src": "https://cdn.phototourl.com/free/2026-06-27-cf33f7fb-4fc0-4446-a575-67adb816986d.png",
+      "src": "/icon.png?v=3",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any"
     },
     {
-      "src": "https://cdn.phototourl.com/free/2026-06-27-cf33f7fb-4fc0-4446-a575-67adb816986d.png",
+      "src": "/icon.png?v=3",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"

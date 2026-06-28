@@ -160,14 +160,18 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
         if (success) {
           setIsLoading(false);
           setLoadError(null);
+          return;
         } else {
-          setIsLoading(false);
-          setLoadError("تم رصد تطبيق أندرويد ولكن تعذر تشغيل الصوت المدمج. يرجى التأكد من حزم ملفات MP3 داخل مجلد assets/www/audio.");
+          console.warn("[AdhanSelector] Native embedded audio failed, falling back to Web Audio.");
+          // Do not return, fall through to play online fallback URLs via standard HTML5 Audio
         }
       } else {
         stopNativeEmbeddedAudio();
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        return;
       }
-      return;
     }
 
     if (audioRef.current) {

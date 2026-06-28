@@ -270,12 +270,14 @@ export default function NotificationCenter() {
       }
 
       const isSilent = localStorage.getItem("silent_mode") === "true";
+      const isDnd = localStorage.getItem("dnd_mode") === "true";
 
+      // 1. Sync standard prayer alarms
       updatedSettings.forEach((s) => {
         if (s.enabled) {
           const prayerTime = times[s.prayerId] || "12:00";
           // Schedule native AlarmManager for the standard prayer
-          const voiceId = isSilent ? "silent" : s.adhanVoiceId;
+          const voiceId = (isSilent || isDnd) ? "silent" : s.adhanVoiceId;
           const success = scheduleNativeAlarm(s.prayerName, prayerTime, voiceId);
           console.log(`[NotificationCenter] Scheduled Alarm ${s.prayerName} at ${prayerTime} with voice ${voiceId}: ${success}`);
 
@@ -287,7 +289,7 @@ export default function NotificationCenter() {
               if (totalMin < 0) totalMin += 24 * 60;
               const preH = String(Math.floor(totalMin / 60)).padStart(2, "0");
               const preM = String(totalMin % 60).padStart(2, "0");
-              const preVoice = isSilent ? "silent" : "pre_reminder";
+              const preVoice = (isSilent || isDnd) ? "silent" : "pre_reminder";
               scheduleNativeAlarm(`الاستعداد لصلاة ${s.prayerName}`, `${preH}:${preM}`, preVoice);
               console.log(`[NotificationCenter] Scheduled 10-Min Pre-Prayer prep alarm at ${preH}:${preM}`);
             } catch (e) {
@@ -296,6 +298,56 @@ export default function NotificationCenter() {
           }
         }
       });
+
+      // 2. Sync Salat-ala-Nabi (Prophet blessings) alarms if enabled!
+      const prophetEnabled = localStorage.getItem("prophet_chimes_enabled") !== "false";
+      if (prophetEnabled && !isSilent) {
+        const voiceId = localStorage.getItem("prophet_chimes_voice") || "real_prophet";
+        const mode = localStorage.getItem("prophet_reminder_mode") || "interval";
+        const startHour = Number(localStorage.getItem("prophet_active_hours_start") || "8");
+        const endHour = Number(localStorage.getItem("prophet_active_hours_end") || "22");
+
+        if (mode === "fixed") {
+          const rawFixed = localStorage.getItem("prophet_daily_times");
+          let fixedTimes: string[] = [];
+          if (rawFixed) {
+            try { fixedTimes = JSON.parse(rawFixed); } catch (e) {}
+          }
+          fixedTimes.forEach((timeStr) => {
+            scheduleNativeAlarm(`الصلاة على النبي ${timeStr}`, timeStr, voiceId);
+            console.log(`[NotificationCenter] Scheduled Native Salat-ala-Nabi alarm at ${timeStr}`);
+          });
+        } else {
+          // interval mode
+          const intervalMins = Number(localStorage.getItem("prophet_reminder_interval") || "60");
+          if (intervalMins > 0) {
+            // Generate periodic times during active hours
+            let currentMin = startHour * 60;
+            const endMin = endHour * 60;
+            
+            const limit = 24; // safe limit of max interval alarms
+            let count = 0;
+            
+            // Handle cross-day boundary (e.g., 22:00 to 06:00)
+            const isCrossDay = startHour > endHour;
+            const maxMin = isCrossDay ? (endHour + 24) * 60 : endMin;
+            
+            while (currentMin <= maxMin && count < limit) {
+              const actualMin = currentMin % (24 * 60);
+              const h = String(Math.floor(actualMin / 60)).padStart(2, "0");
+              const m = String(actualMin % 60).padStart(2, "0");
+              const timeStr = `${h}:${m}`;
+              
+              scheduleNativeAlarm(`الصلاة على النبي ${timeStr}`, timeStr, voiceId);
+              console.log(`[NotificationCenter] Scheduled Periodic Salat-ala-Nabi alarm at ${timeStr}`);
+              
+              currentMin += intervalMins;
+              count++;
+            }
+          }
+        }
+      }
+
       console.log("[NotificationCenter] Done syncing native background alarms.");
     } catch (e) {
       console.error("[NotificationCenter] Failed to sync alarms:", e);

@@ -20,7 +20,8 @@ import {
   Loader2,
   MapPin,
   Navigation,
-  Info
+  Info,
+  BellOff
 } from "lucide-react";
 import { muadhinsList } from "../data/islamicData";
 import { saveAudioByKey, getAudioByKey } from "../utils/audioStorage";
@@ -248,6 +249,21 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     return localStorage.getItem("pre_prayer_prep_enabled") !== "false";
   });
 
+  // Do Not Disturb (DND) Mode setting to mute Adhan/prayer-related alarms
+  const [dndModeEnabled, setDndModeEnabled] = useState<boolean>(() => {
+    return localStorage.getItem("dnd_mode") === "true";
+  });
+
+  // Smart Adhan Volume (Gradual volume rise) setting
+  const [smartVolumeEnabled, setSmartVolumeEnabled] = useState<boolean>(() => {
+    return localStorage.getItem("smart_volume_enabled") !== "false";
+  });
+
+  // Maximum/Target Adhan Volume setting (10 to 100)
+  const [selectedMaxVolume, setSelectedMaxVolume] = useState<number>(() => {
+    return Number(localStorage.getItem("adhan_max_volume") || "90");
+  });
+
   // Pre-prayer custom alert reminder setting minutes
   const [prePrayerPrepTime, setPrePrayerPrepTime] = useState<number>(() => {
     return Number(localStorage.getItem("pre_prayer_prep_time") || "10");
@@ -414,6 +430,26 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     const nextVal = !prePrayerPrepEnabled;
     setPrePrayerPrepEnabled(nextVal);
     localStorage.setItem("pre_prayer_prep_enabled", String(nextVal));
+    window.dispatchEvent(new Event("prayer-reminder-changed"));
+  };
+
+  const toggleDndMode = () => {
+    const nextVal = !dndModeEnabled;
+    setDndModeEnabled(nextVal);
+    localStorage.setItem("dnd_mode", String(nextVal));
+    window.dispatchEvent(new Event("prayer-reminder-changed"));
+  };
+
+  const toggleSmartVolume = () => {
+    const nextVal = !smartVolumeEnabled;
+    setSmartVolumeEnabled(nextVal);
+    localStorage.setItem("smart_volume_enabled", String(nextVal));
+    window.dispatchEvent(new Event("prayer-reminder-changed"));
+  };
+
+  const handleMaxVolumeChange = (vol: number) => {
+    setSelectedMaxVolume(vol);
+    localStorage.setItem("adhan_max_volume", String(vol));
     window.dispatchEvent(new Event("prayer-reminder-changed"));
   };
 
@@ -974,6 +1010,126 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
               </div>
             </div>
           )}
+        </div>
+
+        {/* 🔕 Do Not Disturb (DND) Mode Toggle Section */}
+        <div className={`p-4 rounded-xl border flex flex-col space-y-3.5 ${
+          darkMode ? "bg-slate-950/20 border-white/5" : "bg-amber-50/40 border-amber-900/10"
+        }`}>
+          <div className="flex justify-between items-center w-full">
+            <div className="flex items-center space-x-3 space-x-reverse">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                darkMode ? "bg-amber-500/10 text-amber-400" : "bg-amber-500/20 text-amber-700"
+              }`}>
+                <BellOff className="w-4.5 h-4.5" />
+              </div>
+              <div className="text-right">
+                <span className={`text-xs font-bold block ${darkMode ? "text-slate-100" : "text-slate-900"}`}>
+                  {isAr ? "وضع عدم الإزعاج المؤقت (DND)" : "Do Not Disturb Mode"}
+                </span>
+                <p className="text-[10px] text-slate-400 leading-none mt-0.5">
+                  {isAr 
+                    ? "كتم كافة تنبيهات الأذان والصلوات مؤقتاً دون تعطيل الأذكار والآيات" 
+                    : "Mute all Adhan & prayer alarms temporarily without muting Athkar"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={toggleDndMode}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${
+                dndModeEnabled ? "bg-[#cca05a]" : "bg-slate-800"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-slate-950 shadow-md transform transition-transform duration-300 ${
+                  dndModeEnabled ? "translate-x-[-24px]" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* 🔊 Smart Adhan Volume (Gradual Volume) Toggle & Slider Section */}
+        <div className={`p-4 rounded-xl border flex flex-col space-y-3.5 ${
+          darkMode ? "bg-slate-950/20 border-white/5" : "bg-amber-50/40 border-amber-900/10"
+        }`}>
+          <div className="flex justify-between items-center w-full">
+            <div className="flex items-center space-x-3 space-x-reverse">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                darkMode ? "bg-amber-500/10 text-amber-400" : "bg-amber-500/20 text-amber-700"
+              }`}>
+                <Volume2 className="w-4.5 h-4.5" />
+              </div>
+              <div className="text-right">
+                <span className={`text-xs font-bold block ${darkMode ? "text-slate-100" : "text-slate-900"}`}>
+                  {isAr ? "الصوت التدريجي للأذان (الذكي)" : "Smart Adhan Volume"}
+                </span>
+                <p className="text-[10px] text-slate-400 leading-none mt-0.5">
+                  {isAr 
+                    ? "ارتفاع تدريجي هادئ للصوت لتجنب الإزعاج (خصوصاً صلاة الفجر)" 
+                    : "Gradually increases Adhan volume from 0 to target level"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={toggleSmartVolume}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${
+                smartVolumeEnabled ? "bg-[#cca05a]" : "bg-slate-800"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-slate-950 shadow-md transform transition-transform duration-300 ${
+                  smartVolumeEnabled ? "translate-x-[-24px]" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Volume Level Control */}
+          <div className="pt-3 border-t border-dashed border-[#cca05a]/25 flex flex-col space-y-2 text-right" style={{ direction: "rtl" }}>
+            <div className="flex justify-between items-center">
+              <span className={`text-[10px] font-bold ${darkMode ? "text-amber-200/80" : "text-amber-800"}`}>
+                {isAr ? "مستوى الصوت الأقصى المستهدف:" : "Target Maximum Volume:"}
+              </span>
+              <span className="text-xs font-mono font-bold text-amber-500">
+                {toArabicNumerals(selectedMaxVolume)}%
+              </span>
+            </div>
+            
+            {/* Custom styled range slider */}
+            <div className="flex items-center space-x-3 space-x-reverse">
+              <input
+                type="range"
+                min="10"
+                max="100"
+                step="10"
+                value={selectedMaxVolume}
+                onChange={(e) => handleMaxVolumeChange(Number(e.target.value))}
+                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-800 accent-[#cca05a]"
+              />
+            </div>
+            
+            {/* Preset shortcuts for quick access */}
+            <div className="flex flex-wrap items-center gap-1.5 justify-end mt-1">
+              {[30, 50, 70, 90, 100].map((vol) => (
+                <button
+                  key={vol}
+                  onClick={() => handleMaxVolumeChange(vol)}
+                  className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all duration-200 cursor-pointer ${
+                    selectedMaxVolume === vol
+                      ? "bg-[#cca05a] text-slate-950 border-[#cca05a] shadow-[0_0_8px_rgba(204,160,90,0.3)] font-extrabold"
+                      : darkMode
+                      ? "bg-slate-950/40 text-slate-400 border-white/5 hover:border-[#cca05a]/40"
+                      : "bg-white text-slate-600 border-amber-900/10 hover:border-[#cca05a]"
+                  }`}
+                >
+                  {toArabicNumerals(vol)}%
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 🔊 Tap sounds toggle */}
