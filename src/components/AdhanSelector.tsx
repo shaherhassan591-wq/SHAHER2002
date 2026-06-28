@@ -142,36 +142,27 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
   }, [activeMuadhin]);
 
   useEffect(() => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      if (audioRef.current.paused) {
+        audioRef.current.play().catch((err) => {
+          console.warn("Play promise failed in state sync", err);
+        });
+      }
+    } else {
+      if (!audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
     if (localStorage.getItem("silent_mode") === "true") {
       if (isPlaying) {
         setIsPlaying(false);
         setLoadError("الوضع الصامت مفعّل. يرجى تعطيل الوضع الصامت في صفحة التنبيهات لتتمكن من تشغيل الأذان.");
       }
       return;
-    }
-
-    // Check if we are running in full local native APK WebView
-    if (isNativeAndroid() && !activeMuadhin.id.startsWith("custom_")) {
-      if (isPlaying) {
-        setIsLoading(true);
-        const fileName = `adhan_${activeMuadhin.id}.mp3`;
-        console.log(`[AdhanSelector] Playing via native AndroidBridge: ${fileName}`);
-        const success = playNativeEmbeddedAudio(fileName);
-        if (success) {
-          setIsLoading(false);
-          setLoadError(null);
-          return;
-        } else {
-          console.warn("[AdhanSelector] Native embedded audio failed, falling back to Web Audio.");
-          // Do not return, fall through to play online fallback URLs via standard HTML5 Audio
-        }
-      } else {
-        stopNativeEmbeddedAudio();
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        return;
-      }
     }
 
     if (audioRef.current) {
@@ -230,7 +221,6 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
       setIsLoading(true);
       audio.play().catch((err) => {
         console.warn("Play promise rejected directly", err);
-        // If play is blocked or rejected, attempt fallback transition
         const nextIndex = currentUrlIndex + 1;
         if (nextIndex < adhanUrls.length) {
           setIsLoading(true);
@@ -252,7 +242,7 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
       audio.removeEventListener("error", handleError);
       audio.pause();
     };
-  }, [currentAudioUrl, isPlaying]);
+  }, [currentAudioUrl]);
 
   const toggleSound = () => {
     if (localStorage.getItem("silent_mode") === "true") {
@@ -260,12 +250,7 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
       return;
     }
     
-    // For Native Android, toggle the play state directly without checking html5 audio ref!
-    if (isNativeAndroid() && !activeMuadhin.id.startsWith("custom_")) {
-      setIsPlaying(!isPlaying);
-      return;
-    }
-
+    // Toggle the HTML5 audio play state
     if (!audioRef.current) return;
 
     if (isPlaying) {

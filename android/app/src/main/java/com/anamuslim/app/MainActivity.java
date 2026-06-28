@@ -119,6 +119,30 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public boolean hasLocationPermission() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                return mContext.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            }
+            return true;
+        }
+
+        @JavascriptInterface
+        public void requestLocationPermission() {
+            Log.d(TAG, "requestLocationPermission called");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        MainActivity.this.requestPermissions(new String[]{
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        }, 1002);
+                    }
+                });
+            }
+        }
+
+        @JavascriptInterface
         public void playEmbeddedAudio(String assetName) {
             Log.d(TAG, "playEmbeddedAudio called: " + assetName);
             stopEmbeddedAudio();
@@ -148,6 +172,31 @@ public class MainActivity extends BridgeActivity {
                     Log.e(TAG, "Fallback playback also failed", ex);
                 }
             }
+        }
+
+        @JavascriptInterface
+        public boolean saveAudioFile(String fileName, String base64Data) {
+            Log.d(TAG, "saveAudioFile called: " + fileName);
+            try {
+                byte[] decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT);
+                java.io.File file = new java.io.File(mContext.getFilesDir(), fileName);
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
+                fos.write(decodedBytes);
+                fos.close();
+                Log.d(TAG, "Saved audio file natively to: " + file.getAbsolutePath());
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving audio file: " + fileName, e);
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public boolean hasAudioFile(String fileName) {
+            java.io.File file = new java.io.File(mContext.getFilesDir(), fileName);
+            boolean exists = file.exists() && file.length() > 0;
+            Log.d(TAG, "hasAudioFile check for " + fileName + ": " + exists);
+            return exists;
         }
 
         @JavascriptInterface

@@ -12,7 +12,7 @@ import {
   BookOpen 
 } from "lucide-react";
 import { requestLocalNotificationPermissions, isLocalNotificationsSupported } from "../utils/localNotifications";
-import { isNativeAndroid } from "../utils/androidBridge";
+import { isNativeAndroid, hasNativeLocationPermission, requestNativeLocationPermission } from "../utils/androidBridge";
 
 interface PermissionsModalProps {
   onComplete: () => void;
@@ -36,8 +36,15 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
       }
     }
 
-    // Check Geolocation API (permissions query)
-    if (typeof navigator !== "undefined" && navigator.permissions) {
+    // Check Geolocation status
+    if (isNativeAndroid()) {
+      if (hasNativeLocationPermission()) {
+        setLocationStatus("granted");
+      } else {
+        setLocationStatus("default");
+      }
+    } else if (typeof navigator !== "undefined" && navigator.permissions) {
+      // Check Geolocation API (permissions query)
       navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
         if (result.state === "granted") {
           setLocationStatus("granted");
@@ -107,6 +114,12 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
   // Handler for requesting Location permission
   const handleRequestLocation = () => {
     setIsRequestingLocation(true);
+    
+    // If native android, request native permission first to guarantee dialog trigger
+    if (isNativeAndroid()) {
+      requestNativeLocationPermission();
+    }
+
     if (typeof navigator !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -125,11 +138,16 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
           window.dispatchEvent(new Event("user-location-updated"));
         },
         (error) => {
-          setLocationStatus("denied");
+          // If native, double-check permission state
+          if (isNativeAndroid() && hasNativeLocationPermission()) {
+            setLocationStatus("granted");
+          } else {
+            setLocationStatus("denied");
+          }
           setIsRequestingLocation(false);
           console.warn("Geolocation permission error", error);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     } else {
       setIsRequestingLocation(false);

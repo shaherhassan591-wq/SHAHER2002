@@ -14,6 +14,10 @@ declare global {
       getAppVersion?: () => string;
       playEmbeddedAudio?: (assetName: string) => void;
       stopEmbeddedAudio?: () => void;
+      hasLocationPermission?: () => boolean;
+      requestLocationPermission?: () => void;
+      saveAudioFile?: (fileName: string, base64Data: string) => boolean;
+      hasAudioFile?: (fileName: string) => boolean;
     };
     AndroidBridge?: {
       scheduleAlarm?: (prayerName: string, time24h: string, voiceId: string) => void;
@@ -23,6 +27,10 @@ declare global {
       getAppVersion?: () => string;
       playEmbeddedAudio?: (assetName: string) => void;
       stopEmbeddedAudio?: () => void;
+      hasLocationPermission?: () => boolean;
+      requestLocationPermission?: () => void;
+      saveAudioFile?: (fileName: string, base64Data: string) => boolean;
+      hasAudioFile?: (fileName: string) => boolean;
     };
   }
 }
@@ -220,3 +228,107 @@ export const getOfflineAdhanAudioPath = (voiceId: string): string => {
   // This satisfies: "تضمين ملفات الصوت (Embedded Audio) داخل ملف الـ APK نفسه حتى يشتغل الأذان كاملاً"
   return `./audio/adhan_${voiceId}.mp3`;
 };
+
+/**
+ * Check if the application has native location permission
+ */
+export const hasNativeLocationPermission = (): boolean => {
+  if (typeof window === "undefined") return false;
+
+  if (window.Android && typeof window.Android.hasLocationPermission === "function") {
+    try {
+      return window.Android.hasLocationPermission();
+    } catch (e) {
+      console.warn("Native hasLocationPermission check failed", e);
+    }
+  }
+
+  if (window.AndroidBridge && typeof window.AndroidBridge.hasLocationPermission === "function") {
+    try {
+      return window.AndroidBridge.hasLocationPermission();
+    } catch (e) {
+      console.warn("Native hasLocationPermission check failed", e);
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Request native location permission
+ */
+export const requestNativeLocationPermission = (): boolean => {
+  if (typeof window === "undefined") return false;
+
+  if (window.Android && typeof window.Android.requestLocationPermission === "function") {
+    try {
+      window.Android.requestLocationPermission();
+      return true;
+    } catch (e) {
+      console.warn("Native requestLocationPermission failed", e);
+    }
+  }
+
+  if (window.AndroidBridge && typeof window.AndroidBridge.requestLocationPermission === "function") {
+    try {
+      window.AndroidBridge.requestLocationPermission();
+      return true;
+    } catch (e) {
+      console.warn("Native requestLocationPermission failed", e);
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Save an audio file to native app files directory (useful for offline alarms)
+ */
+export const saveNativeAudioFile = (fileName: string, base64Data: string): boolean => {
+  if (typeof window === "undefined") return false;
+
+  if (window.Android && typeof window.Android.saveAudioFile === "function") {
+    try {
+      return window.Android.saveAudioFile(fileName, base64Data);
+    } catch (e) {
+      console.warn("Native saveAudioFile failed", e);
+    }
+  }
+
+  if (window.AndroidBridge && typeof window.AndroidBridge.saveAudioFile === "function") {
+    try {
+      const res = window.AndroidBridge.saveAudioFile(fileName, base64Data);
+      return res !== false;
+    } catch (e) {
+      console.warn("Native saveAudioFile failed", e);
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Check if a file exists on native storage
+ */
+export const hasNativeAudioFile = (fileName: string): boolean => {
+  if (typeof window === "undefined") return false;
+
+  if (window.Android && typeof window.Android.hasAudioFile === "function") {
+    try {
+      return window.Android.hasAudioFile(fileName);
+    } catch (e) {
+      console.warn("Native hasAudioFile failed", e);
+    }
+  }
+
+  if (window.AndroidBridge && typeof window.AndroidBridge.hasAudioFile === "function") {
+    try {
+      return window.AndroidBridge.hasAudioFile(fileName);
+    } catch (e) {
+      console.warn("Native hasAudioFile failed", e);
+    }
+  }
+
+  return false;
+};
+

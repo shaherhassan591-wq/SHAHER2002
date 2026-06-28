@@ -101,6 +101,29 @@ public class AlarmReceiver extends BroadcastReceiver {
         }
 
         alarmMediaPlayer = new MediaPlayer();
+        
+        // 1. Prioritize playing offline downloaded/cached Adhan file from device's internal storage
+        String localFileName = "adhan_" + voiceId + ".mp3";
+        java.io.File localFile = new java.io.File(context.getFilesDir(), localFileName);
+        if (localFile.exists() && localFile.length() > 0) {
+            try {
+                alarmMediaPlayer.setDataSource(localFile.getAbsolutePath());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    alarmMediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build());
+                }
+                alarmMediaPlayer.setVolume(1.0f, 1.0f);
+                alarmMediaPlayer.prepare();
+                alarmMediaPlayer.start();
+                Log.d(TAG, "Successfully played offline adhan natively from storage: " + localFile.getAbsolutePath());
+                return;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed playing local file, will try assets and online fallback: " + localFileName, e);
+            }
+        }
+
         try {
             // Determine adhan audio asset path inside the packaged web assets
             String assetPath = "public/audio/adhan_" + voiceId + ".mp3";
@@ -155,25 +178,56 @@ public class AlarmReceiver extends BroadcastReceiver {
                                 .build());
                     }
                     alarmMediaPlayer.setVolume(1.0f, 1.0f);
-                    alarmMediaPlayer.prepare();
-                    alarmMediaPlayer.start();
-                    Log.d(TAG, "Playing online fallback audio URL: " + onlineUrl);
+                    
+                    final Context finalContext = context;
+                    alarmMediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                        @Override
+                        public void onPrepared(MediaPlayer mp) {
+                            try {
+                                mp.start();
+                                Log.d(TAG, "Playing online fallback audio URL asynchronously: " + mp.toString());
+                            } catch (Exception ex) {
+                                Log.e(TAG, "Failed starting prepared online player", ex);
+                                playSystemFallback(finalContext);
+                            }
+                        }
+                    });
+                    
+                    alarmMediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+                        @Override
+                        public boolean onError(MediaPlayer mp, int what, int extra) {
+                            Log.e(TAG, "MediaPlayer error preparing online URL: what=" + what + " extra=" + extra);
+                            playSystemFallback(finalContext);
+                            return true;
+                        }
+                    });
+
+                    alarmMediaPlayer.prepareAsync();
+                    Log.d(TAG, "Initiated prepareAsync for online fallback audio URL: " + onlineUrl);
                     return;
                 } catch (Exception ex) {
                     Log.e(TAG, "Failed to play online fallback audio", ex);
                 }
             }
 
-            // Play default system ringtone/notification as fallback
-            try {
-                alarmMediaPlayer.release();
-                alarmMediaPlayer = MediaPlayer.create(context, Settings.System.DEFAULT_ALARM_ALERT_URI);
-                if (alarmMediaPlayer != null) {
-                    alarmMediaPlayer.start();
-                }
-            } catch (Exception ex) {
-                Log.e(TAG, "Failed playing default system sound", ex);
+            playSystemFallback(context);
+        }
+    }
+
+    private void playSystemFallback(Context context) {
+        try {
+            if (alarmMediaPlayer != null) {
+                try {
+                    alarmMediaPlayer.release();
+                } catch (Exception e) {}
             }
+            alarmMediaPlayer = MediaPlayer.create(context, Settings.System.DEFAULT_ALARM_ALERT_URI);
+            if (alarmMediaPlayer != null) {
+                alarmMediaPlayer.start();
+                Log.d(TAG, "Playing default system alarm alert as final fallback.");
+            }
+        } catch (Exception ex) {
+            Log.e(TAG, "Failed playing default system sound", ex);
         }
     }
 

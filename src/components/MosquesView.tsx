@@ -22,6 +22,7 @@ import {
   ChevronDown,
   RefreshCw
 } from "lucide-react";
+import { isNativeAndroid, requestNativeLocationPermission } from "../utils/androidBridge";
 
 // Get API Key securely
 const API_KEY =
@@ -136,6 +137,9 @@ export default function MosquesView({ darkMode }: MosquesViewProps) {
     if (navigator.geolocation) {
       setLoading(true);
       setStatusMessage(isAr ? "جاري تحديد موقعك الجغرافي..." : "Detecting your location...");
+      if (isNativeAndroid()) {
+        requestNativeLocationPermission();
+      }
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const loc = {

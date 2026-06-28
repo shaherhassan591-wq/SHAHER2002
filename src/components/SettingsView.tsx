@@ -32,6 +32,20 @@ import {
   savePrayerCalcSettings,
   recalculateAndStore
 } from "../utils/prayerCalc";
+import { isNativeAndroid, requestNativeLocationPermission, saveNativeAudioFile, hasNativeAudioFile } from "../utils/androidBridge";
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
 interface SettingsViewProps {
   darkMode: boolean;
@@ -53,8 +67,17 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
 
   useEffect(() => {
     // Check if Prophet audio is cached
-    getAudioByKey("real_prophet").then((blob) => {
-      setProphetCached(blob !== null);
+    getAudioByKey("real_prophet").then(async (blob) => {
+      const isCached = blob !== null;
+      setProphetCached(isCached);
+      if (isCached && isNativeAndroid() && !hasNativeAudioFile("adhan_real_prophet.mp3") && blob) {
+        try {
+          const b64 = await blobToBase64(blob);
+          saveNativeAudioFile("adhan_real_prophet.mp3", b64);
+        } catch (e) {
+          console.error("Auto-sync prophet voice failed", e);
+        }
+      }
     }).catch(() => setProphetCached(false));
 
     // Check how many Adhans are cached
@@ -62,7 +85,17 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     const checks = muadhinsList.map(async (m) => {
       try {
         const blob = await getAudioByKey(`adhan_${m.id}`);
-        if (blob) count++;
+        if (blob) {
+          count++;
+          if (isNativeAndroid() && !hasNativeAudioFile(`adhan_${m.id}.mp3`)) {
+            try {
+              const b64 = await blobToBase64(blob);
+              saveNativeAudioFile(`adhan_${m.id}.mp3`, b64);
+            } catch (e) {
+              console.error(`Auto-sync adhan ${m.id} failed`, e);
+            }
+          }
+        }
       } catch (e) {}
     });
     Promise.all(checks).then(() => {
@@ -86,6 +119,14 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
         blob = await res.blob();
       }
       await saveAudioByKey("real_prophet", blob);
+      if (isNativeAndroid()) {
+        try {
+          const b64 = await blobToBase64(blob);
+          saveNativeAudioFile("adhan_real_prophet.mp3", b64);
+        } catch (err) {
+          console.error("Failed to save prophet voice natively", err);
+        }
+      }
       setProphetCached(true);
       setProphetStatusMsg(isAr ? "تم التحميل والحفظ بنجاح! يعمل الصوت الآن بالكامل بدون إنترنت 🟢" : "Saved successfully! Audio works fully offline now 🟢");
     } catch (e) {
@@ -118,6 +159,14 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
           blob = await res.blob();
         }
         await saveAudioByKey(`adhan_${muadhin.id}`, blob);
+        if (isNativeAndroid()) {
+          try {
+            const b64 = await blobToBase64(blob);
+            saveNativeAudioFile(`adhan_${muadhin.id}.mp3`, b64);
+          } catch (err) {
+            console.error(`Failed to save adhan ${muadhin.id} natively`, err);
+          }
+        }
         downloadedCount++;
         setAdhanProgress(Math.round(((i + 1) / muadhinsList.length) * 100));
       } catch (e) {
@@ -207,6 +256,10 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     }
     setGpsLoading(true);
     setGpsError(null);
+
+    if (isNativeAndroid()) {
+      requestNativeLocationPermission();
+    }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
