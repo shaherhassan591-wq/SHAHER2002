@@ -370,4 +370,53 @@ export const ensureLocationPermission = (): Promise<boolean> => {
   });
 };
 
+/**
+ * Safely fetches the current geolocation.
+ * Tries high accuracy first, and if that fails or times out, falls back to coarse accuracy.
+ */
+export const getCurrentPositionWithFallback = (
+  options?: PositionOptions
+): Promise<GeolocationPosition> => {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+
+    const highAccuracyOptions = {
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 0,
+      ...options,
+    };
+
+    const lowAccuracyOptions = {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 60000,
+      ...options,
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve(pos);
+      },
+      (err) => {
+        console.warn("High accuracy location failed, trying low accuracy fallback...", err);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve(pos);
+          },
+          (err2) => {
+            reject(err2);
+          },
+          lowAccuracyOptions
+        );
+      },
+      highAccuracyOptions
+    );
+  });
+};
+
+
 

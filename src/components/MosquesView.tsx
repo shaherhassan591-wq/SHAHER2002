@@ -22,7 +22,7 @@ import {
   ChevronDown,
   RefreshCw
 } from "lucide-react";
-import { isNativeAndroid, requestNativeLocationPermission, ensureLocationPermission } from "../utils/androidBridge";
+import { isNativeAndroid, requestNativeLocationPermission, ensureLocationPermission, getCurrentPositionWithFallback } from "../utils/androidBridge";
 
 // Get API Key securely
 const API_KEY =
@@ -149,8 +149,8 @@ export default function MosquesView({ darkMode }: MosquesViewProps) {
           return;
         }
       }
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
+      getCurrentPositionWithFallback()
+        .then((position) => {
           const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
@@ -159,8 +159,8 @@ export default function MosquesView({ darkMode }: MosquesViewProps) {
           setMapCenter(loc);
           setStatusMessage(isAr ? "تم تحديد موقعك بنجاح" : "Location detected successfully");
           setLoading(false);
-        },
-        (error) => {
+        })
+        .catch((error) => {
           console.warn("Geolocation error:", error);
           setLoading(false);
           setStatusMessage(
@@ -168,9 +168,7 @@ export default function MosquesView({ darkMode }: MosquesViewProps) {
               ? "تعذر الحصول على موقعك الجغرافي تلقائياً. يمكنك استخدام البحث أو التكبير على الخريطة." 
               : "Could not retrieve geolocation automatically. Please use the search bar or map controls."
           );
-        },
-        { enableHighAccuracy: true, timeout: 15000 }
-      );
+        });
     } else {
       setStatusMessage(isAr ? "المتصفح لا يدعم تحديد الموقع" : "Geolocation not supported by browser.");
     }

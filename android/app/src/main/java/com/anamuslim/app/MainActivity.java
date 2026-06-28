@@ -125,7 +125,9 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public boolean hasLocationPermission() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                return mContext.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+                boolean fine = mContext.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+                boolean coarse = mContext.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+                return fine || coarse;
             }
             return true;
         }

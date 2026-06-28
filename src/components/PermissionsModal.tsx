@@ -12,7 +12,7 @@ import {
   BookOpen 
 } from "lucide-react";
 import { requestLocalNotificationPermissions, isLocalNotificationsSupported } from "../utils/localNotifications";
-import { isNativeAndroid, hasNativeLocationPermission, requestNativeLocationPermission, ensureLocationPermission } from "../utils/androidBridge";
+import { isNativeAndroid, hasNativeLocationPermission, requestNativeLocationPermission, ensureLocationPermission, getCurrentPositionWithFallback } from "../utils/androidBridge";
 
 interface PermissionsModalProps {
   onComplete: () => void;
@@ -126,8 +126,8 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
     }
 
     if (typeof navigator !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
+      getCurrentPositionWithFallback()
+        .then((position) => {
           setLocationStatus("granted");
           setIsRequestingLocation(false);
           // Save location coords to localStorage to calculate prayer times instantly
@@ -141,8 +141,8 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
           );
           // Dispatch a custom event so other components (Dashboard, prayer times calculator) update
           window.dispatchEvent(new Event("user-location-updated"));
-        },
-        (error) => {
+        })
+        .catch((error) => {
           // If native, double-check permission state
           if (isNativeAndroid() && hasNativeLocationPermission()) {
             setLocationStatus("granted");
@@ -151,9 +151,7 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
           }
           setIsRequestingLocation(false);
           console.warn("Geolocation permission error", error);
-        },
-        { enableHighAccuracy: true, timeout: 15000 }
-      );
+        });
     } else {
       setIsRequestingLocation(false);
     }

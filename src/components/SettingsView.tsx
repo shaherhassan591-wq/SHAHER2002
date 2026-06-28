@@ -32,7 +32,7 @@ import {
   savePrayerCalcSettings,
   recalculateAndStore
 } from "../utils/prayerCalc";
-import { isNativeAndroid, requestNativeLocationPermission, saveNativeAudioFile, hasNativeAudioFile, ensureLocationPermission } from "../utils/androidBridge";
+import { isNativeAndroid, requestNativeLocationPermission, saveNativeAudioFile, hasNativeAudioFile, ensureLocationPermission, getCurrentPositionWithFallback } from "../utils/androidBridge";
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -266,8 +266,8 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
       }
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
+    getCurrentPositionWithFallback()
+      .then((position) => {
         const { latitude, longitude } = position.coords;
         const offset = new Date().getTimezoneOffset();
         const tz = offset / -60;
@@ -288,8 +288,8 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
         });
         setCalcType("gps");
         setGpsLoading(false);
-      },
-      (error) => {
+      })
+      .catch((error) => {
         console.error("GPS Error:", error);
         let msg = isAr ? "فشل تحديد الموقع. يرجى تفعيل الـ GPS وإعطاء الإذن للتطبيق." : "Failed to detect location. Please check GPS permissions.";
         if (error.code === error.PERMISSION_DENIED) {
@@ -297,9 +297,7 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
         }
         setGpsError(msg);
         setGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
+      });
   };
 
   // Pre-prayer 10 minutes alert reminder setting
