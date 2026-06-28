@@ -22,7 +22,7 @@ import {
   ChevronDown,
   RefreshCw
 } from "lucide-react";
-import { isNativeAndroid, requestNativeLocationPermission } from "../utils/androidBridge";
+import { isNativeAndroid, requestNativeLocationPermission, ensureLocationPermission } from "../utils/androidBridge";
 
 // Get API Key securely
 const API_KEY =
@@ -133,12 +133,21 @@ export default function MosquesView({ darkMode }: MosquesViewProps) {
     detectLocation();
   }, []);
 
-  const detectLocation = () => {
+  const detectLocation = async () => {
     if (navigator.geolocation) {
       setLoading(true);
       setStatusMessage(isAr ? "جاري تحديد موقعك الجغرافي..." : "Detecting your location...");
       if (isNativeAndroid()) {
-        requestNativeLocationPermission();
+        const isGranted = await ensureLocationPermission();
+        if (!isGranted) {
+          setLoading(false);
+          setStatusMessage(
+            isAr 
+              ? "تم رفض إذن الوصول للموقع الجغرافي. يمكنك استخدام البحث أو التكبير على الخريطة." 
+              : "Location permission was denied. Please use the search bar or map controls."
+          );
+          return;
+        }
       }
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -160,7 +169,7 @@ export default function MosquesView({ darkMode }: MosquesViewProps) {
               : "Could not retrieve geolocation automatically. Please use the search bar or map controls."
           );
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     } else {
       setStatusMessage(isAr ? "المتصفح لا يدعم تحديد الموقع" : "Geolocation not supported by browser.");

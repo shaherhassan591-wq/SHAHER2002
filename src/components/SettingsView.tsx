@@ -32,7 +32,7 @@ import {
   savePrayerCalcSettings,
   recalculateAndStore
 } from "../utils/prayerCalc";
-import { isNativeAndroid, requestNativeLocationPermission, saveNativeAudioFile, hasNativeAudioFile } from "../utils/androidBridge";
+import { isNativeAndroid, requestNativeLocationPermission, saveNativeAudioFile, hasNativeAudioFile, ensureLocationPermission } from "../utils/androidBridge";
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -249,7 +249,7 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     savePrayerCalcSettings({ asrJuristic: juristic });
   };
 
-  const handleFetchGPS = () => {
+  const handleFetchGPS = async () => {
     if (!navigator.geolocation) {
       setGpsError(isAr ? "متصفحك لا يدعم تحديد الموقع الجغرافي." : "Geolocation is not supported by your browser.");
       return;
@@ -258,7 +258,12 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     setGpsError(null);
 
     if (isNativeAndroid()) {
-      requestNativeLocationPermission();
+      const isGranted = await ensureLocationPermission();
+      if (!isGranted) {
+        setGpsError(isAr ? "تم رفض إذن الوصول للموقع الجغرافي." : "Location permission was denied.");
+        setGpsLoading(false);
+        return;
+      }
     }
 
     navigator.geolocation.getCurrentPosition(
@@ -293,7 +298,7 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
         setGpsError(msg);
         setGpsLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   };
 

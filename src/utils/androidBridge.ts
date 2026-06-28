@@ -332,3 +332,42 @@ export const hasNativeAudioFile = (fileName: string): boolean => {
   return false;
 };
 
+/**
+ * Request location permission and wait for the user to grant/deny it.
+ * On native Android, it requests permission and polls until granted or timeout.
+ * On non-native Web, it resolves immediately with true.
+ */
+export const ensureLocationPermission = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (!isNativeAndroid()) {
+      resolve(true);
+      return;
+    }
+
+    if (hasNativeLocationPermission()) {
+      resolve(true);
+      return;
+    }
+
+    // Trigger the native dialog
+    requestNativeLocationPermission();
+
+    // Poll for the permission state
+    let attempts = 0;
+    const maxAttempts = 30; // 30 * 500ms = 15 seconds
+    const interval = setInterval(() => {
+      if (hasNativeLocationPermission()) {
+        clearInterval(interval);
+        resolve(true);
+      } else {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }
+    }, 500);
+  });
+};
+
+

@@ -12,7 +12,7 @@ import {
   BookOpen 
 } from "lucide-react";
 import { requestLocalNotificationPermissions, isLocalNotificationsSupported } from "../utils/localNotifications";
-import { isNativeAndroid, hasNativeLocationPermission, requestNativeLocationPermission } from "../utils/androidBridge";
+import { isNativeAndroid, hasNativeLocationPermission, requestNativeLocationPermission, ensureLocationPermission } from "../utils/androidBridge";
 
 interface PermissionsModalProps {
   onComplete: () => void;
@@ -112,12 +112,17 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
   };
 
   // Handler for requesting Location permission
-  const handleRequestLocation = () => {
+  const handleRequestLocation = async () => {
     setIsRequestingLocation(true);
     
-    // If native android, request native permission first to guarantee dialog trigger
+    // If native android, request and wait for the native permission to be granted/denied
     if (isNativeAndroid()) {
-      requestNativeLocationPermission();
+      const isGranted = await ensureLocationPermission();
+      if (!isGranted) {
+        setLocationStatus("denied");
+        setIsRequestingLocation(false);
+        return;
+      }
     }
 
     if (typeof navigator !== "undefined" && navigator.geolocation) {

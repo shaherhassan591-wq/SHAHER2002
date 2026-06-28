@@ -36,10 +36,14 @@ public class MainActivity extends BridgeActivity {
     private void registerBridgeInterface() {
         WebView webView = getBridge().getWebView();
         if (webView != null) {
+            // Explicitly enable geolocation in WebView settings to avoid silent rejection
+            webView.getSettings().setGeolocationEnabled(true);
+            webView.getSettings().setGeolocationDatabasePath(getFilesDir().getPath());
+            
             AndroidBridgeInterface bridge = new AndroidBridgeInterface(this);
             webView.addJavascriptInterface(bridge, "Android");
             webView.addJavascriptInterface(bridge, "AndroidBridge");
-            Log.d(TAG, "Successfully registered Javascript interfaces: 'Android' & 'AndroidBridge'");
+            Log.d(TAG, "Successfully registered Javascript interfaces: 'Android' & 'AndroidBridge' and enabled WebView Geolocation");
         } else {
             Log.e(TAG, "WebView is null! Failed to register Javascript interface.");
         }
