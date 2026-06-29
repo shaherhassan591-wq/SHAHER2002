@@ -40,10 +40,18 @@ public class MainActivity extends BridgeActivity {
             webView.getSettings().setGeolocationEnabled(true);
             webView.getSettings().setGeolocationDatabasePath(getFilesDir().getPath());
             
+            // Ensure standard Geolocation requests inside WebView are automatically granted
+            webView.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
+                @Override
+                public void onGeolocationPermissionsShowPrompt(String origin, android.webkit.GeolocationPermissions.Callback callback) {
+                    callback.invoke(origin, true, false);
+                }
+            });
+            
             AndroidBridgeInterface bridge = new AndroidBridgeInterface(this);
             webView.addJavascriptInterface(bridge, "Android");
             webView.addJavascriptInterface(bridge, "AndroidBridge");
-            Log.d(TAG, "Successfully registered Javascript interfaces: 'Android' & 'AndroidBridge' and enabled WebView Geolocation");
+            Log.d(TAG, "Successfully registered Javascript interfaces: 'Android' & 'AndroidBridge' and enabled WebView Geolocation with custom WebChromeClient");
         } else {
             Log.e(TAG, "WebView is null! Failed to register Javascript interface.");
         }
@@ -143,6 +151,55 @@ public class MainActivity extends BridgeActivity {
                             android.Manifest.permission.ACCESS_FINE_LOCATION,
                             android.Manifest.permission.ACCESS_COARSE_LOCATION
                         }, 1002);
+                    }
+                });
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isGpsEnabled() {
+            try {
+                android.location.LocationManager lm = (android.location.LocationManager) mContext.getSystemService(Context.LOCATION_SERVICE);
+                if (lm != null) {
+                    return lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                           lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking if GPS is enabled", e);
+            }
+            return false;
+        }
+
+        @JavascriptInterface
+        public void openLocationSettings() {
+            Log.d(TAG, "openLocationSettings called");
+            try {
+                Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                mContext.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Error opening location settings", e);
+            }
+        }
+
+        @JavascriptInterface
+        public boolean hasNotificationPermission() {
+            if (Build.VERSION.SDK_INT >= 33) { // Android 13+ (Tiramisu)
+                return mContext.checkSelfPermission("android.permission.POST_NOTIFICATIONS") == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            }
+            return true;
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            Log.d(TAG, "requestNotificationPermission called");
+            if (Build.VERSION.SDK_INT >= 33) {
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        MainActivity.this.requestPermissions(new String[]{
+                            "android.permission.POST_NOTIFICATIONS"
+                        }, 1003);
                     }
                 });
             }

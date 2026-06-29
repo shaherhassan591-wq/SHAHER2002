@@ -18,6 +18,10 @@ declare global {
       requestLocationPermission?: () => void;
       saveAudioFile?: (fileName: string, base64Data: string) => boolean;
       hasAudioFile?: (fileName: string) => boolean;
+      isGpsEnabled?: () => boolean;
+      openLocationSettings?: () => void;
+      hasNotificationPermission?: () => boolean;
+      requestNotificationPermission?: () => void;
     };
     AndroidBridge?: {
       scheduleAlarm?: (prayerName: string, time24h: string, voiceId: string) => void;
@@ -31,6 +35,10 @@ declare global {
       requestLocationPermission?: () => void;
       saveAudioFile?: (fileName: string, base64Data: string) => boolean;
       hasAudioFile?: (fileName: string) => boolean;
+      isGpsEnabled?: () => boolean;
+      openLocationSettings?: () => void;
+      hasNotificationPermission?: () => boolean;
+      requestNotificationPermission?: () => void;
     };
   }
 }
@@ -416,6 +424,58 @@ export const getCurrentPositionWithFallback = (
       highAccuracyOptions
     );
   });
+};
+
+/**
+ * Check if GPS / Location services are enabled in system settings
+ */
+export const isGpsEnabled = (): boolean => {
+  if (typeof window === "undefined") return true;
+  if (window.Android && typeof window.Android.isGpsEnabled === "function") {
+    return window.Android.isGpsEnabled();
+  }
+  if (window.AndroidBridge && typeof window.AndroidBridge.isGpsEnabled === "function") {
+    return window.AndroidBridge.isGpsEnabled();
+  }
+  return true;
+};
+
+/**
+ * Open Android system Location Settings panel
+ */
+export const openLocationSettings = (): void => {
+  if (typeof window === "undefined") return;
+  if (window.Android && typeof window.Android.openLocationSettings === "function") {
+    window.Android.openLocationSettings();
+  } else if (window.AndroidBridge && typeof window.AndroidBridge.openLocationSettings === "function") {
+    window.AndroidBridge.openLocationSettings();
+  }
+};
+
+/**
+ * Check if the app has OS level notification permission (Android 13+)
+ */
+export const hasNotificationPermission = (): boolean => {
+  if (typeof window === "undefined") return true;
+  if (window.Android && typeof window.Android.hasNotificationPermission === "function") {
+    return window.Android.hasNotificationPermission();
+  }
+  if (window.AndroidBridge && typeof window.AndroidBridge.hasNotificationPermission === "function") {
+    return window.AndroidBridge.hasNotificationPermission();
+  }
+  return true;
+};
+
+/**
+ * Request OS level notification permission dialog (Android 13+)
+ */
+export const requestNotificationPermission = (): void => {
+  if (typeof window === "undefined") return;
+  if (window.Android && typeof window.Android.requestNotificationPermission === "function") {
+    window.Android.requestNotificationPermission();
+  } else if (window.AndroidBridge && typeof window.AndroidBridge.requestNotificationPermission === "function") {
+    window.AndroidBridge.requestNotificationPermission();
+  }
 };
 
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../context/LanguageContext";
+import { formatTime12h } from "../utils/timeFormat";
 import { getCustomAudio, saveCustomAudio, hasCustomAudio, deleteCustomAudio, getAudioByKey } from "../utils/audioStorage";
 import {
   AreaChart,
@@ -86,7 +87,7 @@ const dailyVerses: DailyVerse[] = [
 ];
 
 const PROPHET_VOICES = [
-  { id: "real_prophet", nameAr: "النبي صلّوا عليه", nameEn: "Sallou Alayh (Original)", url: "https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3" },
+  { id: "real_prophet", nameAr: "النبي صلّوا عليه", nameEn: "Sallou Alayh (Original)", url: "/audio/real_prophet.mp3" },
   { id: "custom_voice", nameAr: "📁 ملف صوتي مخصص...", nameEn: "📁 Custom audio file...", url: "" }
 ];
 
@@ -473,9 +474,14 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
     ];
   });
 
+  const [use12hFormat, setUse12hFormat] = useState<boolean>(() => {
+    return localStorage.getItem("use_12h_format") !== "false";
+  });
+
   useEffect(() => {
     const handleSync = () => {
       try {
+        setUse12hFormat(localStorage.getItem("use_12h_format") !== "false");
         const raw = localStorage.getItem("calculated_prayer_times");
         if (raw) {
           const parsed = JSON.parse(raw);
@@ -1638,7 +1644,7 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
             <span className="text-slate-300 font-mono">
               {isAr 
                 ? `بقي ${nextPrayer.timeLeft} لـ ${nextPrayer.name}` 
-                : `${nextPrayer.timeLeft} remaining until ${nextPrayer.name}`} ({nextPrayer.time})
+                : `${nextPrayer.timeLeft} remaining until ${nextPrayer.name}`} ({use12hFormat ? formatTime12h(nextPrayer.time, isAr) : nextPrayer.time})
             </span>
           </div>
           
@@ -1763,12 +1769,12 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
           <p className="text-xs text-white leading-relaxed font-sans mt-2">
             {isAr ? (
               <>
-                بقي أقل من <span className="text-[#ffe082] font-extrabold text-sm font-mono leading-none">١٠ دقائق</span> للنداء المبارك لصلاة <span className="text-[#ffe082] font-bold text-sm">{nextPrayer.name}</span> ({nextPrayer.time}).
+                بقي أقل من <span className="text-[#ffe082] font-extrabold text-sm font-mono leading-none">١٠ دقائق</span> للنداء المبارك لصلاة <span className="text-[#ffe082] font-bold text-sm">{nextPrayer.name}</span> ({use12hFormat ? formatTime12h(nextPrayer.time, isAr) : nextPrayer.time}).
                 استعد بالوضوء العاطر في طمأنينة الآن وصلاة السنن الراتبة وتلاوة طائفة من الأذكار لنيل الأجر الكامل الموفور والخشوع في صلاتك.
               </>
             ) : (
               <>
-                Less than <span className="text-[#ffe082] font-extrabold text-sm font-mono leading-none">10 minutes</span> left until the blessed call for <span className="text-[#ffe082] font-bold text-sm">{nextPrayer.name}</span> prayer ({nextPrayer.time}).
+                Less than <span className="text-[#ffe082] font-extrabold text-sm font-mono leading-none">10 minutes</span> left until the blessed call for <span className="text-[#ffe082] font-bold text-sm">{nextPrayer.name}</span> prayer ({use12hFormat ? formatTime12h(nextPrayer.time, isAr) : nextPrayer.time}).
                 Prepare yourself now with fragrant Wudu in serenity, pray Sunnah, and recite daily dhikr to attain full reward of worship.
               </>
             )}
@@ -2081,7 +2087,7 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
               </span>
               <div className="flex items-baseline justify-end gap-1.5 mt-0.5">
                 <span className="text-3xl font-mono font-black text-white leading-none">
-                  {nextPrayer.time}
+                  {use12hFormat ? formatTime12h(nextPrayer.time, isAr) : nextPrayer.time}
                 </span>
                 <span className="text-[10px] text-slate-400 font-bold">
                   {isAr ? "بتوقيتك" : "Local"}
@@ -2470,7 +2476,9 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
                 )}
                 
                 <span className="text-xs font-bold text-[#cca05a]/90">{pt.name}</span>
-                <span className="text-2xl font-mono font-extrabold tracking-wide">{pt.time}</span>
+                <span className="text-2xl font-mono font-extrabold tracking-wide">
+                  {use12hFormat ? formatTime12h(pt.time, isAr) : pt.time}
+                </span>
                 <span className="text-[9px] text-slate-400 font-mono tracking-widest block">محلي تلقائي</span>
 
                 {/* Pulsing golden base glow for active prayer */}

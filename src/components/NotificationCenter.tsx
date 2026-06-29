@@ -1354,7 +1354,7 @@ export default function NotificationCenter() {
                         audioObj.volume = 0.8;
                         audioObj.play().catch(() => {});
                       } else {
-                        const audioObj = new Audio("https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3");
+                        const audioObj = new Audio("/audio/real_prophet.mp3");
                         audioObj.volume = 0.8;
                         audioObj.play().catch(() => {});
                       }
@@ -1362,7 +1362,7 @@ export default function NotificationCenter() {
                   });
                   return;
                 }
-                const mp3 = "https://www.image2url.com/r2/default/audio/1782321479411-ea702e89-715f-4941-b8f4-468c5a3ab9e8.mp3"; // default / real_prophet
+                const mp3 = "/audio/real_prophet.mp3"; // default / real_prophet
                 import("../utils/audioStorage").then(({ getAudioByKey }) => {
                   getAudioByKey("real_prophet").then(blob => {
                     if (blob) {

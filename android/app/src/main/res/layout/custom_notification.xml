@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:background="#071b29"
+    android:gravity="center_vertical">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingEnd="12dp"
+        android:paddingRight="12dp"
+        android:gravity="end">
+
+        <TextView
+            android:id="@+id/notification_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="تنبيه الأذان"
+            android:textColor="#cca05a"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:gravity="end" />
+
+        <TextView
+            android:id="@+id/notification_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="حان الآن موعد صلاة الفجر"
+            android:textColor="#ffffff"
+            android:textSize="13sp"
+            android:layout_marginTop="4dp"
+            android:gravity="end" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/notification_icon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@android:drawable/ic_dialog_info"
+        android:padding="8dp"
+        android:background="#152e42"
+        android:scaleType="fitCenter" />
+</LinearLayout>

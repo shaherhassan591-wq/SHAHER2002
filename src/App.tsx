@@ -19,6 +19,7 @@ import CardsView from "./components/CardsView";
 import SpiritualAssistantView from "./components/SpiritualAssistantView";
 import PermissionsModal from "./components/PermissionsModal";
 import { initGlobalTapSounds } from "./utils/soundEffects";
+import { autoCacheEssentialAudios } from "./utils/autoCache";
 import { useLanguage } from "./context/LanguageContext";
 import { quranData, athkarData, hadithsList } from "./data/islamicData";
 import { quranIndex } from "./data/quranIndex";
@@ -259,6 +260,7 @@ export default function App() {
 
   useEffect(() => {
     initGlobalTapSounds();
+    autoCacheEssentialAudios();
   }, []);
 
   useEffect(() => {

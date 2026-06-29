@@ -215,6 +215,11 @@ export function savePrayerCalcSettings(settings: Partial<PrayerCalcSettings>): v
 }
 
 export function recalculateAndStore(): void {
+  // Prevent automatic overwriting of user adjustments if manual prayer times mode is enabled
+  if (localStorage.getItem("manual_prayer_times_mode") === "true") {
+    return;
+  }
+
   const settings = getPrayerCalcSettings();
   let lat = 24.7136; // Riyadh defaults
   let lng = 46.6753;
