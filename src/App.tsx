@@ -287,8 +287,35 @@ export default function App() {
     let touchStartY = 0;
 
     const handleTouchStart = (e: TouchEvent) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      const target = e.target as HTMLElement;
+      if (target && (
+        target.tagName === "INPUT" ||
+        target.tagName === "BUTTON" ||
+        target.tagName === "SELECT" ||
+        target.tagName === "TEXTAREA" ||
+        target.closest("button") ||
+        target.closest("input") ||
+        target.closest(".no-swipe")
+      )) {
+        touchStartX = 0;
+        touchStartY = 0;
+        return;
+      }
+
+      const clientX = e.touches[0].clientX;
+      const width = window.innerWidth;
+
+      // Only allow swipe-to-back if it starts near the edge (within 50px of left or right edge)
+      const isNearLeftEdge = clientX < 50;
+      const isNearRightEdge = clientX > width - 50;
+
+      if (isNearLeftEdge || isNearRightEdge) {
+        touchStartX = clientX;
+        touchStartY = e.touches[0].clientY;
+      } else {
+        touchStartX = 0;
+        touchStartY = 0;
+      }
     };
 
     const handleTouchEnd = (e: TouchEvent) => {

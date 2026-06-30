@@ -1233,8 +1233,10 @@ export default function NotificationCenter() {
               <label className="text-[10px] text-amber-200/70 font-bold block text-right">🎙️ اختر الصوت البشري للتذكير بالصلوات على النبي ﷺ:</label>
               <div className="grid grid-cols-2 md:grid-cols-2 gap-1.5" style={{ direction: "rtl" }}>
                 {[
-                  { id: "real_prophet", name: "النبي صلّوا عليه" },
-                  { id: "custom_voice", name: "📁 مخصص" }
+                  { id: "real_prophet", name: isAr ? "النبي صلّوا عليه (العفاسي)" : "Sallou Alayh (Al-Afasy)" },
+                  { id: "prophet_voice_1", name: isAr ? "زدج - الصوت الأول" : "Zedge - Voice 1" },
+                  { id: "prophet_voice_2", name: isAr ? "زدج - الصوت الثاني" : "Zedge - Voice 2" },
+                  { id: "custom_voice", name: isAr ? "📁 مخصص..." : "📁 Custom..." }
                 ].map((voice) => (
                   <button
                     key={voice.id}
@@ -1354,7 +1356,7 @@ export default function NotificationCenter() {
                         audioObj.volume = 0.8;
                         audioObj.play().catch(() => {});
                       } else {
-                        const audioObj = new Audio("/audio/real_prophet.mp3");
+                        const audioObj = new Audio("/audio/real_prophet.mp3?v=3");
                         audioObj.volume = 0.8;
                         audioObj.play().catch(() => {});
                       }
@@ -1362,9 +1364,9 @@ export default function NotificationCenter() {
                   });
                   return;
                 }
-                const mp3 = "/audio/real_prophet.mp3"; // default / real_prophet
+                const mp3 = "/audio/real_prophet.mp3?v=3"; // default / real_prophet
                 import("../utils/audioStorage").then(({ getAudioByKey }) => {
-                  getAudioByKey("real_prophet").then(blob => {
+                  getAudioByKey("real_prophet_v3").then(blob => {
                     if (blob) {
                       const objectUrl = URL.createObjectURL(blob);
                       const audioObj = new Audio(objectUrl);

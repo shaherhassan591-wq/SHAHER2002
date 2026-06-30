@@ -87,7 +87,9 @@ const dailyVerses: DailyVerse[] = [
 ];
 
 const PROPHET_VOICES = [
-  { id: "real_prophet", nameAr: "النبي صلّوا عليه", nameEn: "Sallou Alayh (Original)", url: "/audio/real_prophet.mp3" },
+  { id: "real_prophet", nameAr: "النبي صلّوا عليه (العفاسي)", nameEn: "Sallou Alayh (Al-Afasy)", url: "/audio/real_prophet.mp3?v=3" },
+  { id: "prophet_voice_1", nameAr: "الصلاة على النبي (زدج - الصوت الأول)", nameEn: "Sallou Alayh (Voice 1)", url: "/audio/prophet_voice_1.mp3" },
+  { id: "prophet_voice_2", nameAr: "الصلاة على النبي (زدج - الصوت الثاني)", nameEn: "Sallou Alayh (Voice 2)", url: "/audio/prophet_voice_2.mp3" },
   { id: "custom_voice", nameAr: "📁 ملف صوتي مخصص...", nameEn: "📁 Custom audio file...", url: "" }
 ];
 
@@ -609,9 +611,16 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
       setCustomAudioName(savedName || "");
     };
 
+    const handlePlayPending = () => {
+      console.log("[Dashboard] play-pending-salawat event received. Triggering Salat audio.");
+      playVoiceChime();
+    };
+
     window.addEventListener("prophet-reminder-changed", handleProphetChange);
+    window.addEventListener("play-pending-salawat", handlePlayPending);
     return () => {
       window.removeEventListener("prophet-reminder-changed", handleProphetChange);
+      window.removeEventListener("play-pending-salawat", handlePlayPending);
     };
   }, []);
 
@@ -634,10 +643,18 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
         return;
       }
 
+      // Priority check: If Adhan is currently playing, queue this Salat reminder
+      if ((window as any).__adhanPlaying) {
+        console.log("[Dashboard] Adhan is currently playing. Queuing Salat reminder sequentially.");
+        (window as any).__pendingSalawat = true;
+        return;
+      }
+
       // Stop current if playing
       if (salawatAudioRef.current) {
         salawatAudioRef.current.pause();
         salawatAudioRef.current = null;
+        (window as any).__salawatAudio = null;
       }
 
       const voiceInfo = PROPHET_VOICES.find(v => v.id === prophetChimesVoice) || PROPHET_VOICES[0];
@@ -648,25 +665,40 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
             const objectUrl = URL.createObjectURL(blob);
             const audio = new Audio(objectUrl);
             salawatAudioRef.current = audio;
+            (window as any).__salawatAudio = audio;
             audio.play().then(() => {
               console.log("[Dashboard] Played custom audio successfully.");
             }).catch(err => {
               console.warn("Failed to play custom object url", err);
               playSyntheticSalawat();
             });
+            audio.onended = () => {
+              (window as any).__salawatAudio = null;
+            };
+            audio.onerror = () => {
+              (window as any).__salawatAudio = null;
+            };
           } else {
             console.warn("No custom audio blob found, playing default voice.");
             // Fallback play default
             const defaultVoice = PROPHET_VOICES[0];
             const defaultUrl = defaultVoice.url;
-            const defaultProxied = `/api/proxy-audio?url=${encodeURIComponent(defaultUrl)}`;
+            const defaultProxied = defaultUrl.startsWith("http") ? `/api/proxy-audio?url=${encodeURIComponent(defaultUrl)}` : defaultUrl;
             const audio = new Audio(defaultProxied);
             salawatAudioRef.current = audio;
+            (window as any).__salawatAudio = audio;
             audio.play().catch(() => {
               const direct = new Audio(defaultUrl);
               salawatAudioRef.current = direct;
+              (window as any).__salawatAudio = direct;
               direct.play().catch(() => playSyntheticSalawat());
+              direct.onended = () => {
+                (window as any).__salawatAudio = null;
+              };
             });
+            audio.onended = () => {
+              (window as any).__salawatAudio = null;
+            };
           }
         }).catch(err => {
           console.error("Error reading custom audio:", err);
@@ -675,53 +707,79 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
         return;
       }
 
-      if (voiceInfo.id === "real_prophet") {
-        getAudioByKey("real_prophet").then(blob => {
+      let dbKey = "";
+      if (voiceInfo.id === "real_prophet") dbKey = "real_prophet_v3";
+      else if (voiceInfo.id === "prophet_voice_1") dbKey = "prophet_voice_1_v1";
+      else if (voiceInfo.id === "prophet_voice_2") dbKey = "prophet_voice_2_v1";
+
+      if (dbKey) {
+        getAudioByKey(dbKey).then(blob => {
           if (blob) {
             const objectUrl = URL.createObjectURL(blob);
             const audio = new Audio(objectUrl);
             salawatAudioRef.current = audio;
+            (window as any).__salawatAudio = audio;
             audio.play().then(() => {
-              console.log("[Dashboard] Played cached real_prophet audio successfully.");
+              console.log(`[Dashboard] Played cached ${voiceInfo.id} audio successfully.`);
             }).catch(err => {
-              console.warn("Failed to play cached real_prophet, fallback to synthetic", err);
+              console.warn(`Failed to play cached ${voiceInfo.id}, fallback to synthetic`, err);
               playSyntheticSalawat();
             });
+            audio.onended = () => {
+              (window as any).__salawatAudio = null;
+            };
           } else {
             // Not cached, stream normally
             const fullUrl = voiceInfo.url;
-            const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}`;
+            const proxiedUrl = fullUrl.startsWith("http") ? `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}` : fullUrl;
             const audio = new Audio(proxiedUrl);
             salawatAudioRef.current = audio;
+            (window as any).__salawatAudio = audio;
             audio.preload = "auto";
             audio.play().catch(() => {
               const directAudio = new Audio(fullUrl);
               salawatAudioRef.current = directAudio;
+              (window as any).__salawatAudio = directAudio;
               directAudio.play().catch(() => playSyntheticSalawat());
+              directAudio.onended = () => {
+                (window as any).__salawatAudio = null;
+              };
             });
+            audio.onended = () => {
+              (window as any).__salawatAudio = null;
+            };
           }
         }).catch(() => {
           // Fallback stream normally
           const fullUrl = voiceInfo.url;
-          const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}`;
+          const proxiedUrl = fullUrl.startsWith("http") ? `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}` : fullUrl;
           const audio = new Audio(proxiedUrl);
           salawatAudioRef.current = audio;
+          (window as any).__salawatAudio = audio;
           audio.preload = "auto";
           audio.play().catch(() => {
             const directAudio = new Audio(fullUrl);
             salawatAudioRef.current = directAudio;
+            (window as any).__salawatAudio = directAudio;
             directAudio.play().catch(() => playSyntheticSalawat());
+            directAudio.onended = () => {
+              (window as any).__salawatAudio = null;
+            };
           });
+          audio.onended = () => {
+            (window as any).__salawatAudio = null;
+          };
         });
         return;
       }
 
       const fullUrl = voiceInfo.url;
-      const proxiedUrl = `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}`;
+      const proxiedUrl = fullUrl.startsWith("http") ? `/api/proxy-audio?url=${encodeURIComponent(fullUrl)}` : fullUrl;
       console.log(`[Dashboard] Attempting to play Salawat [${voiceInfo.id}]: ${proxiedUrl}`);
 
       const audio = new Audio(proxiedUrl);
       salawatAudioRef.current = audio;
+      (window as any).__salawatAudio = audio;
       audio.preload = "auto";
       
       audio.play()
@@ -732,11 +790,18 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
           console.warn("Proxy failing, playing direct...", err);
           const directAudio = new Audio(fullUrl);
           salawatAudioRef.current = directAudio;
+          (window as any).__salawatAudio = directAudio;
           directAudio.play().catch(e => {
             console.warn("All direct audio attempts failed, fallback to SpeechSynthesis.", e);
             playSyntheticSalawat();
           });
+          directAudio.onended = () => {
+            (window as any).__salawatAudio = null;
+          };
         });
+      audio.onended = () => {
+        (window as any).__salawatAudio = null;
+      };
     } catch (e) {
       console.warn("Audio play exception:", e);
       playSyntheticSalawat();
@@ -845,7 +910,8 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
     const prefetchSalawatAudios = async () => {
       try {
         for (const voice of PROPHET_VOICES) {
-          const proxied = `/api/proxy-audio?url=${encodeURIComponent(voice.url)}`;
+          if (!voice.url) continue;
+          const proxied = voice.url.startsWith("http") ? `/api/proxy-audio?url=${encodeURIComponent(voice.url)}` : voice.url;
           fetch(proxied, { priority: "low" } as any).catch(() => {});
         }
         console.log("[Dashboard] Offline prefetch complete for the default human salawat voice.");

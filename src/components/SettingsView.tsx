@@ -86,7 +86,7 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
 
   useEffect(() => {
     // Check if Prophet audio is cached
-    getAudioByKey("real_prophet").then(async (blob) => {
+    getAudioByKey("real_prophet_v3").then(async (blob) => {
       const isCached = blob !== null;
       setProphetCached(isCached);
       if (isCached && isNativeAndroid() && !hasNativeAudioFile("adhan_real_prophet.mp3") && blob) {
@@ -126,7 +126,7 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
     setDownloadingProphet(true);
     setProphetStatusMsg(isAr ? "جاري تحميل وتخزين صوت الصلاة على النبي أوفلاين..." : "Downloading Prophet audio offline...");
     try {
-      const url = "/audio/real_prophet.mp3";
+      const url = "/audio/real_prophet.mp3?v=3";
       let blob: Blob;
       try {
         const res = await fetch(url);
@@ -134,11 +134,11 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
         blob = await res.blob();
       } catch (err) {
         // Fail-safe to online if local fetch fails
-        const onlineUrl = "https://storage.pdftolink.io/users/guest/4a185c90-df6f-4a94-ae66-53f1e0fd1155.mp3";
+        const onlineUrl = "https://archive.org/download/nbeslo3leh/%D8%A7%D9%84%D9%86%D8%A8%D9%8A%20%D1%81%D9%84%D9%88%D8%A7%20%D8%B9%D9%84%D9%8A%D9%87.mp3";
         const res = await fetch(onlineUrl);
         blob = await res.blob();
       }
-      await saveAudioByKey("real_prophet", blob);
+      await saveAudioByKey("real_prophet_v3", blob);
       if (isNativeAndroid()) {
         try {
           const b64 = await blobToBase64(blob);

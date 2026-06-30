@@ -34,6 +34,21 @@ async function startServer() {
          return res.status(400).send("Parameter 'url' is required.");
       }
 
+      // Handle relative paths gracefully by serving from public folder
+      if (!audioUrl.startsWith("http://") && !audioUrl.startsWith("https://")) {
+        let cleanPath = audioUrl.startsWith("/") ? audioUrl.slice(1) : audioUrl;
+        // Strip any query parameters (like ?v=2) to resolve on disk
+        const queryIndex = cleanPath.indexOf("?");
+        if (queryIndex !== -1) {
+          cleanPath = cleanPath.substring(0, queryIndex);
+        }
+        const filePath = path.join(process.cwd(), "public", cleanPath);
+        if (fs.existsSync(filePath)) {
+          return res.sendFile(filePath);
+        }
+        return res.status(404).send("Local audio file not found.");
+      }
+
       // Safely auto-encode non-ASCII (such as Arabic in archive.org or other urls)
       const safeUrl = new URL(audioUrl).toString();
 

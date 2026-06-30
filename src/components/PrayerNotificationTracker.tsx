@@ -230,6 +230,16 @@ export default function PrayerNotificationTracker() {
     volumeIntervalRef.current = intervalId;
   };
 
+  const handleAdhanFinished = () => {
+    setIsPlayingAdhan(false);
+    (window as any).__adhanPlaying = false;
+    if ((window as any).__pendingSalawat) {
+      (window as any).__pendingSalawat = false;
+      console.log("[PrayerNotificationTracker] Adhan finished. Resuming pending Salat reminder sequentially.");
+      window.dispatchEvent(new CustomEvent("play-pending-salawat"));
+    }
+  };
+
   const playAdhanAudio = (voiceId: string) => {
     // 1. Silent mode and DND check
     if (localStorage.getItem("silent_mode") === "true") {
@@ -239,6 +249,17 @@ export default function PrayerNotificationTracker() {
     if (localStorage.getItem("dnd_mode") === "true") {
       console.log("[PrayerNotificationTracker] Do Not Disturb active. Adhan audio play skipped.");
       return;
+    }
+
+    // High Priority Preemption: Pause any currently playing Salat on Prophet audio
+    if ((window as any).__salawatAudio) {
+      try {
+        ((window as any).__salawatAudio as HTMLAudioElement).pause();
+        (window as any).__pendingSalawat = true;
+        console.log("[PrayerNotificationTracker] Preempted currently playing Salat reminder for high priority Adhan.");
+      } catch (e) {
+        console.error("Error preempting Salat audio:", e);
+      }
     }
 
     if (volumeIntervalRef.current) {
@@ -257,6 +278,7 @@ export default function PrayerNotificationTracker() {
       if (index >= urls.length) {
         console.error("[PrayerNotificationTracker] All fallback audio URLs failed.");
         setIsPlayingAdhan(false);
+        (window as any).__adhanPlaying = false;
         return;
       }
 
@@ -270,6 +292,7 @@ export default function PrayerNotificationTracker() {
       audio.play()
         .then(() => {
           setIsPlayingAdhan(true);
+          (window as any).__adhanPlaying = true;
           console.log(`[PrayerNotificationTracker] Successfully playing adhan url index ${index}: ${activeUrl}`);
         })
         .catch((err) => {
@@ -279,7 +302,7 @@ export default function PrayerNotificationTracker() {
         });
 
       audio.onended = () => {
-        setIsPlayingAdhan(false);
+        handleAdhanFinished();
       };
     };
 
@@ -299,13 +322,14 @@ export default function PrayerNotificationTracker() {
           audio.play()
             .then(() => {
               setIsPlayingAdhan(true);
+              (window as any).__adhanPlaying = true;
             })
             .catch((err) => {
               console.error("[PrayerNotificationTracker] Failed playing cached blob, falling back to network.", err);
               playWithFallback();
             });
           audio.onended = () => {
-            setIsPlayingAdhan(false);
+            handleAdhanFinished();
           };
         } else {
           console.log(`[PrayerNotificationTracker] No offline cache found for ${voiceId}, falling back to network URLs.`);
@@ -342,7 +366,13 @@ export default function PrayerNotificationTracker() {
       audioRef.current.pause();
     }
     setIsPlayingAdhan(false);
+    (window as any).__adhanPlaying = false;
     setActiveAlert(null);
+    if ((window as any).__pendingSalawat) {
+      (window as any).__pendingSalawat = false;
+      console.log("[PrayerNotificationTracker] Adhan stopped. Triggering pending Salat reminder sequentially.");
+      window.dispatchEvent(new CustomEvent("play-pending-salawat"));
+    }
   };
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { saveAudioByKey, getAudioByKey } from "./audioStorage";
+import { saveAudioByKey, getAudioByKey, deleteAudioByKey } from "./audioStorage";
 import { isNativeAndroid, saveNativeAudioFile, hasNativeAudioFile } from "./androidBridge";
 import { muadhinsList } from "../data/islamicData";
 
@@ -23,47 +23,65 @@ export async function autoCacheEssentialAudios(): Promise<void> {
   try {
     console.log("[AutoCache] Starting background check for essential audio assets...");
 
-    // 1. Prophet Blessing audio pre-caching
-    const prophetKey = "real_prophet";
-    const prophetUrl = "/audio/real_prophet.mp3";
-    
-    let needsProphetDownload = false;
-    let prophetBlob: Blob | null = null;
-
+    // Clean up any old prophet caches if they exist (to clear any wrong voices)
     try {
-      prophetBlob = await getAudioByKey(prophetKey);
-      if (!prophetBlob) {
-        needsProphetDownload = true;
-      } else if (isNativeAndroid() && !hasNativeAudioFile("adhan_real_prophet.mp3")) {
-        // Exists in IndexedDB but missing in native Android storage, sync it!
-        console.log("[AutoCache] Syncing Prophet audio from IndexedDB to native Android...");
-        const b64 = await blobToBase64(prophetBlob);
-        saveNativeAudioFile("adhan_real_prophet.mp3", b64);
+      const oldBlob = await getAudioByKey("real_prophet");
+      if (oldBlob) {
+        console.log("[AutoCache] Old prophet voice detected. Deleting old key from IndexedDB...");
+        await deleteAudioByKey("real_prophet");
+      }
+      const oldBlob2 = await getAudioByKey("real_prophet_v2");
+      if (oldBlob2) {
+        console.log("[AutoCache] Old v2 prophet voice detected. Deleting old key from IndexedDB...");
+        await deleteAudioByKey("real_prophet_v2");
       }
     } catch (e) {
-      needsProphetDownload = true;
+      console.warn("[AutoCache] Failed to delete old prophet cache keys", e);
     }
 
-    if (needsProphetDownload) {
-      console.log("[AutoCache] Downloading Prophet blessing audio for offline use...");
+    // 1. Prophet Blessing audios pre-caching
+    const prophetVoicesToCache = [
+      { key: "real_prophet_v3", url: "/audio/real_prophet.mp3?v=3", filename: "adhan_real_prophet.mp3", fallbackUrl: "https://archive.org/download/nbeslo3leh/%D8%A7%D9%84%D9%86%D8%A8%D9%8A%20%D1%81%D9%84%D9%88%D8%A7%20%D8%B9%D9%84%D9%8A%D9%87.mp3" },
+      { key: "prophet_voice_1_v1", url: "/audio/prophet_voice_1.mp3", filename: "adhan_prophet_voice_1.mp3", fallbackUrl: "" },
+      { key: "prophet_voice_2_v1", url: "/audio/prophet_voice_2.mp3", filename: "adhan_prophet_voice_2.mp3", fallbackUrl: "" }
+    ];
+
+    for (const item of prophetVoicesToCache) {
+      let needsDownload = false;
+      let blob: Blob | null = null;
+
       try {
-        let res = await fetch(prophetUrl);
-        if (!res.ok) {
-          // Fail-safe to online if local fetch fails
-          const onlineUrl = "https://storage.pdftolink.io/users/guest/4a185c90-df6f-4a94-ae66-53f1e0fd1155.mp3";
-          res = await fetch(onlineUrl);
+        blob = await getAudioByKey(item.key);
+        if (!blob) {
+          needsDownload = true;
+        } else if (isNativeAndroid() && !hasNativeAudioFile(item.filename)) {
+          console.log(`[AutoCache] Syncing ${item.filename} from IndexedDB to native Android...`);
+          const b64 = await blobToBase64(blob);
+          saveNativeAudioFile(item.filename, b64);
         }
-        if (res.ok) {
-          const blob = await res.blob();
-          await saveAudioByKey(prophetKey, blob);
-          if (isNativeAndroid()) {
-            const b64 = await blobToBase64(blob);
-            saveNativeAudioFile("adhan_real_prophet.mp3", b64);
+      } catch (e) {
+        needsDownload = true;
+      }
+
+      if (needsDownload) {
+        console.log(`[AutoCache] Downloading ${item.filename} for offline use...`);
+        try {
+          let res = await fetch(item.url);
+          if (!res.ok && item.fallbackUrl) {
+            res = await fetch(item.fallbackUrl);
           }
-          console.log("[AutoCache] Prophet blessing audio pre-cached successfully!");
+          if (res.ok) {
+            const downloadedBlob = await res.blob();
+            await saveAudioByKey(item.key, downloadedBlob);
+            if (isNativeAndroid()) {
+              const b64 = await blobToBase64(downloadedBlob);
+              saveNativeAudioFile(item.filename, b64);
+            }
+            console.log(`[AutoCache] ${item.filename} pre-cached successfully!`);
+          }
+        } catch (err) {
+          console.warn(`[AutoCache] Failed to download ${item.filename}`, err);
         }
-      } catch (err) {
-        console.warn("[AutoCache] Failed to download Prophet blessing audio", err);
       }
     }
 

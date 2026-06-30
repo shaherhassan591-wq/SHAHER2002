@@ -8,6 +8,7 @@ import {
 import { quranData } from "../data/islamicData";
 import { quranIndex } from "../data/quranIndex";
 import { Surah, FavoriteVerse } from "../types";
+import { useLanguage } from "../context/LanguageContext";
 
 export const SURAH_PAGE_RANGES: Record<number, { start: number; end: number }> = {
   1: { start: 1, end: 1 },
@@ -274,6 +275,7 @@ export function VerseEndSymbol({ number }: { number: number }) {
 }
 
 export default function QuranView({ darkMode = true }: { darkMode?: boolean }) {
+  const { isAr } = useLanguage();
   const [selectedSurahMeta, setSelectedSurahMeta] = useState<any>(quranIndex[0]);
   const [currentSurahData, setCurrentSurahData] = useState<Surah | null>(quranData[0]);
   const [isLoadingSurah, setIsLoadingSurah] = useState<boolean>(false);
@@ -930,13 +932,13 @@ export default function QuranView({ darkMode = true }: { darkMode?: boolean }) {
     setIsDownloadingAll(true);
     setDownloadError(null);
     setDownloadProgress(0);
-    setDownloadMessage("جاري إعداد الاتصال بالخادم...");
+    setDownloadMessage(isAr ? "جاري إعداد الاتصال بالخادم..." : "Preparing connection to server...");
 
     try {
       for (let i = 1; i <= 114; i++) {
         setDownloadProgress(i);
-        const name = quranIndex[i-1].name;
-        setDownloadMessage(`جاري تنزيل سورة ${name} وتفسيرها (${i} من ١١٤)...`);
+        const name = isAr ? quranIndex[i-1].name : quranIndex[i-1].englishName;
+        setDownloadMessage(isAr ? `جاري تنزيل سورة ${name} وتفسيرها (${i} من ١١٤)...` : `Downloading Surah ${name} & translation (${i} of 114)...`);
 
         // If already in localStorage, skip API fetch
         if (localStorage.getItem(`cached_surah_${i}`)) {
@@ -1451,27 +1453,32 @@ export default function QuranView({ darkMode = true }: { darkMode?: boolean }) {
       {/* 📡 NETWORK STATUS & OFFLINE PROGRESS BANNER */}
       <div className={`rounded-2xl p-3 mb-4 flex flex-wrap justify-between items-center text-right shadow-sm border ${
         darkMode ? "bg-[#082235] border-white/5" : "bg-slate-50 border-slate-200"
-      }`} style={{ direction: "rtl" }}>
+      }`} style={{ direction: isAr ? "rtl" : "ltr" }}>
         
         {/* Network status */}
         <div className="flex items-center space-x-2 space-x-reverse text-xs">
           {isOnline ? (
             <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-500/20 font-bold">
               <Wifi className="w-3.5 h-3.5 animate-pulse" />
-              متصل بالإنترنت
+              {isAr ? "متصل بالإنترنت" : "Online"}
             </span>
           ) : (
             <span className="bg-amber-500/15 text-amber-400 px-2.5 py-1 rounded-full flex items-center gap-1 border border-amber-500/25 font-bold font-sans">
               <WifiOff className="w-3.5 h-3.5" />
-              الوضع غير المتصل (أوفلاين)
+              {isAr ? "الوضع غير المتصل (أوفلاين)" : "Offline Mode"}
             </span>
           )}
           
-          <span className={`text-[10px] ${darkMode ? "text-slate-400" : "text-slate-600"} font-normal`}>
+          <span className={`text-[10px] ${darkMode ? "text-slate-400" : "text-slate-600"} font-normal px-2`}>
             {cachedSurahsCount === 114 ? (
-              <span className="text-emerald-400 font-bold">📚 كامل المصحف (١١٤ سورة) تـم حفظها أوفلاين</span>
+              <span className="text-emerald-400 font-bold">
+                {isAr ? "📚 كامل المصحف (١١٤ سورة) تـم حفظها أوفلاين" : "📚 Full Holy Quran (114 Surahs) saved offline"}
+              </span>
             ) : (
-              <span>🟢 السور المحفوظة أوفلاين: <strong>{cachedSurahsCount} من ١١٤</strong></span>
+              <span>
+                {isAr ? "🟢 السور المحفوظة أوفلاين: " : "🟢 Cached Surahs Offline: "}
+                <strong>{cachedSurahsCount} {isAr ? "من ١١٤" : "of 114"}</strong>
+              </span>
             )}
           </span>
         </div>
@@ -1494,7 +1501,9 @@ export default function QuranView({ darkMode = true }: { darkMode?: boolean }) {
             ) : (
               <Download className="w-3.5 h-3.5" />
             )}
-            {isDownloadingAll ? "جاري التثبيت أوفلاين..." : "تحميل القرآن كاملاً للأوفلاين دفعة واحدة 📥"}
+            {isDownloadingAll 
+              ? (isAr ? "جاري التثبيت أوفلاين..." : "Installing offline...") 
+              : (isAr ? "تحميل القرآن كاملاً للأوفلاين دفعة واحدة 📥" : "Download full Quran for offline 📥")}
           </button>
         )}
       </div>
@@ -1503,9 +1512,9 @@ export default function QuranView({ darkMode = true }: { darkMode?: boolean }) {
       {isDownloadingAll && (
         <div className={`border-2 rounded-2xl p-4 mb-4 text-right shadow-lg ${
           darkMode ? "bg-slate-900 border-amber-500/30 text-white" : "bg-amber-50/70 border-amber-200 text-slate-900"
-        }`} style={{ direction: "rtl" }}>
+        }`} style={{ direction: isAr ? "rtl" : "ltr" }}>
           <div className="flex justify-between items-center mb-1.5 text-xs font-bold">
-            <span className="text-amber-400">تجهيز المنهاج كامل بدون إنترنت</span>
+            <span className="text-amber-400">{isAr ? "تجهيز المنهج كامل بدون إنترنت" : "Preparing full offline Quran"}</span>
             <span>{Math.round((downloadProgress / 114) * 100)}%</span>
           </div>
           

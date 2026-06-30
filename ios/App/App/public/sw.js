@@ -1,5 +1,5 @@
 // Advanced Offline Service Worker for "Ana Muslim" PWA
-const CACHE_NAME = 'ana-muslim-premium-cache-v2';
+const CACHE_NAME = 'ana-muslim-premium-cache-v4';
 
 const OFFLINE_URLS = [
   '/',

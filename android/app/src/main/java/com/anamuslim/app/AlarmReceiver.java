@@ -15,7 +15,7 @@ import androidx.core.app.NotificationCompat;
 
 public class AlarmReceiver extends BroadcastReceiver {
     private static final String TAG = "AlarmReceiver";
-    private static final String CHANNEL_ID = "prayer-times-v3-channel";
+    private static final String CHANNEL_ID = "prayer-times-v4-channel";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -95,10 +95,14 @@ public class AlarmReceiver extends BroadcastReceiver {
                 try {
                     Intent serviceIntent = new Intent(context, AlarmSoundService.class);
                     serviceIntent.putExtra("voiceId", voiceId);
-                    context.startService(serviceIntent);
-                    Log.d(TAG, "Successfully delegated playback to AlarmSoundService");
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent);
+                    } else {
+                        context.startService(serviceIntent);
+                    }
+                    Log.d(TAG, "Successfully delegated playback to AlarmSoundService as Foreground Service");
                 } catch (Exception ex) {
-                    Log.e(TAG, "Failed to start AlarmSoundService from background, ignoring.", ex);
+                    Log.e(TAG, "Failed to start AlarmSoundService, ignoring.", ex);
                 }
             }
 

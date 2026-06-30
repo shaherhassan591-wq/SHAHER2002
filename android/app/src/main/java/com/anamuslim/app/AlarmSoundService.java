@@ -9,16 +9,24 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AlarmSoundService extends Service {
     private static final String TAG = "AlarmSoundService";
     private MediaPlayer mediaPlayer;
     private PowerManager.WakeLock wakeLock;
 
+    private final List<String> playQueue = new ArrayList<>();
+    private String activeVoiceId = null;
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
     }
+
+    private static final String PLAYBACK_CHANNEL_ID = "alarm-playback-channel";
+    private static final int FOREGROUND_NOTIFICATION_ID = 9091;
 
     @Override
     public void onCreate() {
@@ -31,24 +39,129 @@ public class AlarmSoundService extends Service {
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AnaMuslim:AlarmSoundServiceWakeLock");
             wakeLock.acquire(10 * 60 * 1000); // 10 minutes maximum duration
         }
+
+        createPlaybackNotificationChannel();
+    }
+
+    private void createPlaybackNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationChannel channel = new android.app.NotificationChannel(
+                    PLAYBACK_CHANNEL_ID,
+                    "تشغيل أصوات التنبيهات",
+                    android.app.NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("يقوم بتشغيل أصوات الأذان وتنبيهات الصلاة على النبي في الخلفية");
+            channel.setSound(null, null);
+            channel.enableVibration(false);
+            android.app.NotificationManager manager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
-            stopSelf();
+            synchronized (playQueue) {
+                if (activeVoiceId == null && playQueue.isEmpty()) {
+                    stopSelf();
+                }
+            }
             return START_NOT_STICKY;
         }
 
         String voiceId = intent.getStringExtra("voiceId");
         Log.d(TAG, "onStartCommand: Received voiceId: " + voiceId);
 
-        playAudio(voiceId);
+        // Build a notification for the foreground service to meet Oreo+ background service requirements
+        int appIconResId = getApplicationInfo().icon;
+        if (appIconResId == 0) {
+            appIconResId = android.R.drawable.ic_dialog_info;
+        }
+
+        androidx.core.app.NotificationCompat.Builder builder = new androidx.core.app.NotificationCompat.Builder(this, PLAYBACK_CHANNEL_ID)
+                .setSmallIcon(appIconResId)
+                .setContentTitle("تطبيق أنا مسلم")
+                .setContentText("جاري تشغيل صوت التنبيه المخصص...")
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_LOW)
+                .setCategory(androidx.core.app.NotificationCompat.CATEGORY_SERVICE)
+                .setAutoCancel(true);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(FOREGROUND_NOTIFICATION_ID, builder.build(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        } else {
+            startForeground(FOREGROUND_NOTIFICATION_ID, builder.build());
+        }
+
+        if (voiceId == null || voiceId.equals("silent")) {
+            Log.d(TAG, "Received silent or null voiceId. Ignoring.");
+            synchronized (playQueue) {
+                if (activeVoiceId == null && playQueue.isEmpty()) {
+                    stopSelf();
+                }
+            }
+            return START_NOT_STICKY;
+        }
+
+        handleIncomingVoice(voiceId);
 
         return START_NOT_STICKY;
     }
 
-    private void playAudio(String voiceId) {
+    private void handleIncomingVoice(String voiceId) {
+        synchronized (playQueue) {
+            boolean incomingIsProphet = voiceId.contains("prophet") || voiceId.equals("pre_reminder");
+
+            if (activeVoiceId == null) {
+                // Nothing playing, start playing immediately
+                activeVoiceId = voiceId;
+                playAudioDirect(voiceId);
+            } else {
+                boolean activeIsProphet = activeVoiceId.contains("prophet") || activeVoiceId.equals("pre_reminder");
+
+                if (activeIsProphet && !incomingIsProphet) {
+                    // Preemption! Incoming is high-priority Adhan, current is low-priority Prophet
+                    Log.d(TAG, "Preempting low-priority Prophet reminder [" + activeVoiceId + "] for high-priority Adhan [" + voiceId + "]");
+                    
+                    // Put the stopped Prophet reminder back to queue (to play after Adhan)
+                    playQueue.add(0, activeVoiceId);
+                    
+                    // Stop current playback
+                    if (mediaPlayer != null) {
+                        try {
+                            mediaPlayer.stop();
+                        } catch (Exception e) {}
+                    }
+                    
+                    // Start Adhan immediately
+                    activeVoiceId = voiceId;
+                    playAudioDirect(voiceId);
+                } else {
+                    // Sequential queuing!
+                    Log.d(TAG, "Queuing audio [" + voiceId + "] sequentially behind active [" + activeVoiceId + "]");
+                    playQueue.add(voiceId);
+                }
+            }
+        }
+    }
+
+    private void playNext() {
+        synchronized (playQueue) {
+            if (playQueue.isEmpty()) {
+                Log.d(TAG, "No more audio in queue. Stopping service.");
+                activeVoiceId = null;
+                stopSelf();
+            } else {
+                String nextVoiceId = playQueue.remove(0);
+                activeVoiceId = nextVoiceId;
+                Log.d(TAG, "Playing next queued audio: " + nextVoiceId);
+                playAudioDirect(nextVoiceId);
+            }
+        }
+    }
+
+    private void playAudioDirect(String voiceId) {
         if (mediaPlayer != null) {
             try {
                 mediaPlayer.release();
@@ -57,15 +170,8 @@ public class AlarmSoundService extends Service {
 
         mediaPlayer = new MediaPlayer();
 
-        // 1. If silent, play nothing
-        if (voiceId == null || voiceId.equals("silent")) {
-            Log.d(TAG, "VoiceId is silent. Stopping service.");
-            stopSelf();
-            return;
-        }
-
         String resolvedVoiceId = voiceId;
-        if (voiceId.contains("prophet") || voiceId.equals("pre_reminder")) {
+        if (voiceId.equals("prophet") || voiceId.equals("pre_reminder")) {
             resolvedVoiceId = "real_prophet";
         }
 
@@ -89,7 +195,7 @@ public class AlarmSoundService extends Service {
                     @Override
                     public void onCompletion(MediaPlayer mp) {
                         Log.d(TAG, "Finished playing local file.");
-                        stopSelf();
+                        playNext();
                     }
                 });
 
@@ -122,7 +228,7 @@ public class AlarmSoundService extends Service {
                 @Override
                 public void onCompletion(MediaPlayer mp) {
                     Log.d(TAG, "Finished playing asset file.");
-                    stopSelf();
+                    playNext();
                 }
             });
 
@@ -146,8 +252,12 @@ public class AlarmSoundService extends Service {
             onlineUrl = "https://dn710002.ca.archive.org/0/items/90---azan---90---azan--many----sound----mp3---alazan_662/045--.mp3";
         } else if (voiceId.equals("makkah_2")) {
             onlineUrl = "https://dn710603.ca.archive.org/0/items/90---azan---90---azan--many----sound----mp3---alazan/019--1.mp3";
+        } else if (voiceId.equals("prophet_voice_1")) {
+            onlineUrl = "https://ais-pre-4njjxv7a6hjryet3spykcm-960490970057.europe-west2.run.app/audio/prophet_voice_1.mp3";
+        } else if (voiceId.equals("prophet_voice_2")) {
+            onlineUrl = "https://ais-pre-4njjxv7a6hjryet3spykcm-960490970057.europe-west2.run.app/audio/prophet_voice_2.mp3";
         } else if (voiceId.contains("prophet") || voiceId.equals("real_prophet") || voiceId.equals("pre_reminder")) {
-            onlineUrl = "https://storage.pdftolink.io/users/guest/4a185c90-df6f-4a94-ae66-53f1e0fd1155.mp3";
+            onlineUrl = "https://archive.org/download/abhd1984520_gmail_20150511_1134/%D8%B5%D9%84%D9%88%D8%A7%20%D8%B9%D9%84%D9%8A%D9%87%20%D9%88%D8%B3%D9%84%D9%85%D9%88%D8%A7%20%D8%AA%D8%B3%D9%84%D9%8A%D9%85%D8%A7%20.%20%D8%A7%D9%84%D8%B9%D9%81%D8%A7%D8%B3%D9%8A.mp3";
         }
 
         if (onlineUrl != null) {
@@ -171,7 +281,7 @@ public class AlarmSoundService extends Service {
                             Log.d(TAG, "Playing online fallback audio URL asynchronously.");
                         } catch (Exception ex) {
                             Log.e(TAG, "Failed starting prepared online player", ex);
-                            stopSelf();
+                            playNext();
                         }
                     }
                 });
@@ -180,7 +290,7 @@ public class AlarmSoundService extends Service {
                     @Override
                     public boolean onError(MediaPlayer mp, int what, int extra) {
                         Log.e(TAG, "MediaPlayer error preparing online URL: what=" + what + " extra=" + extra);
-                        stopSelf();
+                        playNext();
                         return true;
                     }
                 });
@@ -188,7 +298,7 @@ public class AlarmSoundService extends Service {
                 mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                     @Override
                     public void onCompletion(MediaPlayer mp) {
-                        stopSelf();
+                        playNext();
                     }
                 });
 
@@ -200,13 +310,17 @@ public class AlarmSoundService extends Service {
             }
         }
 
-        // If all plays failed, stop the service
-        stopSelf();
+        // If all plays failed, play next queued item
+        playNext();
     }
 
     @Override
     public void onDestroy() {
         Log.d(TAG, "AlarmSoundService destroyed");
+        synchronized (playQueue) {
+            playQueue.clear();
+            activeVoiceId = null;
+        }
         if (mediaPlayer != null) {
             try {
                 if (mediaPlayer.isPlaying()) {
