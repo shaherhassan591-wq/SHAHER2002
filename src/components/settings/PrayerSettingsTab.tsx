@@ -1,5 +1,6 @@
 import React from "react";
 import { MapPin, Navigation, CheckCircle2, Loader2, Clock } from "lucide-react";
+import { EGYPT_GOVERNORATES } from "../../data/egyptLocations";
 
 interface PrayerSettingsTabProps {
   darkMode: boolean;
@@ -60,6 +61,64 @@ export const PrayerSettingsTab: React.FC<PrayerSettingsTabProps> = ({
   const [manualName, setManualName] = React.useState(gpsLocation.name || (isAr ? "موقعي اليدوي" : "My Manual Coordinates"));
   const [manualSaveSuccess, setManualSaveSuccess] = React.useState(false);
 
+  // States for Egypt Manual Selection
+  const [selectedRegion, setSelectedRegion] = React.useState<"global" | "egypt">(() => {
+    if (gpsLocation.name && (gpsLocation.name.includes("مصر") || gpsLocation.name.includes("Egypt") || gpsLocation.name.includes("Cairo") || gpsLocation.name.includes("القاهرة"))) {
+      return "egypt";
+    }
+    return "global";
+  });
+
+  const [selectedGovId, setSelectedGovId] = React.useState<string>(() => {
+    if (gpsLocation.name) {
+      const foundGov = EGYPT_GOVERNORATES.find(gov => gpsLocation.name.includes(gov.nameAr) || gpsLocation.name.includes(gov.nameEn));
+      if (foundGov) return foundGov.id;
+    }
+    return "cairo";
+  });
+
+  const activeGov = EGYPT_GOVERNORATES.find(gov => gov.id === selectedGovId) || EGYPT_GOVERNORATES[0];
+
+  const [selectedCenterId, setSelectedCenterId] = React.useState<string>(() => {
+    if (gpsLocation.name) {
+      const foundGov = EGYPT_GOVERNORATES.find(gov => gpsLocation.name.includes(gov.nameAr) || gpsLocation.name.includes(gov.nameEn));
+      if (foundGov) {
+        const foundCenter = foundGov.centers.find(c => gpsLocation.name.includes(c.nameAr) || gpsLocation.name.includes(c.nameEn));
+        if (foundCenter) return foundCenter.id;
+      }
+    }
+    return activeGov.centers[0]?.id || "";
+  });
+
+  const handleGovChange = (govId: string) => {
+    setSelectedGovId(govId);
+    const gov = EGYPT_GOVERNORATES.find(g => g.id === govId);
+    if (gov && gov.centers.length > 0) {
+      setSelectedCenterId(gov.centers[0].id);
+    }
+  };
+
+  const onApplyEgyptCenter = () => {
+    const gov = EGYPT_GOVERNORATES.find(g => g.id === selectedGovId);
+    const center = gov?.centers.find(c => c.id === selectedCenterId);
+    if (gov && center && handleSaveManualCoords) {
+      const fullName = `مصر، ${gov.nameAr}، ${center.nameAr}`;
+      const timezone = new Date().getTimezoneOffset() / -60;
+      
+      // Save manual coords as Custom Location
+      handleSaveManualCoords(center.lat, center.lng, fullName, timezone);
+      
+      // Switch calculation type to coordinate-based GPS calculation
+      handleUpdateCalcType("gps");
+      
+      // Set calculation method to Egypt Survey Authority (الهيئة المصرية العامة للمساحة)
+      handleUpdateMethod("egypt");
+      
+      setManualSaveSuccess(true);
+      setTimeout(() => setManualSaveSuccess(false), 4000);
+    }
+  };
+
   const onSaveManual = () => {
     const latNum = parseFloat(manualLat);
     const lngNum = parseFloat(manualLng);
@@ -116,48 +175,154 @@ export const PrayerSettingsTab: React.FC<PrayerSettingsTabProps> = ({
         </div>
 
         {/* 1. Manual City Selection Panel */}
-        {calcType === "city" && (
-          <div className="space-y-3 text-right" style={{ direction: "rtl" }}>
-            <span className="text-[10px] text-slate-400 block font-bold">
-              {isAr ? "اختر المدينة الحالية:" : "Select Current City:"}
-            </span>
-            <select
-              value={selectedCity}
-              onChange={(e) => handleUpdateCity(e.target.value)}
-              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border outline-none focus:border-[#cca05a] transition-all cursor-pointer ${
-                darkMode ? "bg-slate-950/60 border-white/5 text-slate-100" : "bg-white border-amber-950/15 text-slate-900"
-              }`}
-            >
-              {CITIES.map((c) => (
-                <option key={c.id} value={c.id} className={darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"}>
-                  {isAr ? c.nameAr : c.nameEn}
-                </option>
-              ))}
-            </select>
+        {calcType === "city" ? (
+          <div className="space-y-4" style={{ direction: "rtl" }}>
+            <div className="flex gap-2 p-0.5 rounded-lg bg-slate-950/20 border border-white/5 justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedRegion("egypt")}
+                className={`flex-1 py-1.5 px-2 text-[10px] font-bold rounded-md transition duration-200 cursor-pointer ${
+                  selectedRegion === "egypt"
+                    ? "bg-amber-400 text-slate-950 shadow font-extrabold"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                🇪🇬 {isAr ? "محافظات ومراكز مصر" : "Egypt Governorates"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRegion("global")}
+                className={`flex-1 py-1.5 px-2 text-[10px] font-bold rounded-md transition duration-200 cursor-pointer ${
+                  selectedRegion === "global"
+                    ? "bg-amber-400 text-slate-950 shadow font-extrabold"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                🌍 {isAr ? "مدن وعواصم عالمية" : "Global Cities"}
+              </button>
+            </div>
 
-            {/* Quick Access City Chips */}
-            <div className="flex flex-wrap gap-1.5 justify-start mt-2">
-              {[
-                { id: "mecca", nameAr: "🕋 مكة", nameEn: "Mecca" },
-                { id: "madinah", nameAr: "🕌 المدينة", nameEn: "Medina" },
-                { id: "riyadh", nameAr: "🇸🇦 الرياض", nameEn: "Riyadh" },
-                { id: "cairo", nameAr: "🇪🇬 القاهرة", nameEn: "Cairo" },
-                { id: "jerusalem", nameAr: "🇵🇸 القدس", nameEn: "Jerusalem" }
-              ].map((quick) => (
-                <button
-                  key={quick.id}
-                  onClick={() => handleUpdateCity(quick.id)}
-                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all duration-200 cursor-pointer ${
-                    selectedCity === quick.id
-                      ? "bg-[#cca05a]/25 text-amber-200 border-[#cca05a]"
-                      : "bg-slate-950/30 text-slate-400 border-white/5 hover:border-white/10"
+            {selectedRegion === "global" ? (
+              <div className="space-y-3 text-right">
+                <span className="text-[10px] text-slate-400 block font-bold">
+                  {isAr ? "اختر المدينة الحالية:" : "Select Current City:"}
+                </span>
+                <select
+                  value={selectedCity}
+                  onChange={(e) => handleUpdateCity(e.target.value)}
+                  className={`w-full px-3 py-2 text-xs font-medium rounded-xl border outline-none focus:border-[#cca05a] transition-all cursor-pointer ${
+                    darkMode ? "bg-slate-950/60 border-white/5 text-slate-100" : "bg-white border-amber-950/15 text-slate-900"
                   }`}
                 >
-                  {isAr ? quick.nameAr : quick.nameEn}
+                  {CITIES.map((c) => (
+                    <option key={c.id} value={c.id} className={darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"}>
+                      {isAr ? c.nameAr : c.nameEn}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Quick Access City Chips */}
+                <div className="flex flex-wrap gap-1.5 justify-start mt-2">
+                  {[
+                    { id: "mecca", nameAr: "🕋 مكة", nameEn: "Mecca" },
+                    { id: "madinah", nameAr: "🕌 المدينة", nameEn: "Medina" },
+                    { id: "riyadh", nameAr: "🇸🇦 الرياض", nameEn: "Riyadh" },
+                    { id: "cairo", nameAr: "🇪🇬 القاهرة", nameEn: "Cairo" },
+                    { id: "jerusalem", nameAr: "🇵🇸 القدس", nameEn: "Jerusalem" }
+                  ].map((quick) => (
+                    <button
+                      key={quick.id}
+                      onClick={() => handleUpdateCity(quick.id)}
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all duration-200 cursor-pointer ${
+                        selectedCity === quick.id
+                          ? "bg-[#cca05a]/25 text-amber-200 border-[#cca05a]"
+                          : "bg-slate-950/30 text-slate-400 border-white/5 hover:border-white/10"
+                      }`}
+                    >
+                      {isAr ? quick.nameAr : quick.nameEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-right">
+                <p className="text-[10px] text-amber-200/80 leading-relaxed font-bold border-r-2 border-amber-500/50 pr-2">
+                  💡 {isAr 
+                    ? "اختر محافظتك ومركزك في مصر وسيتم ضبط خطوط الطول والعرض وتطبيق طريقة الحساب الرسمية المصرية لضمان دقة المواعيد."
+                    : "Select your governorate and center in Egypt to apply exact coordinates and the official Egyptian survey standard."}
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-slate-400 block font-bold">{isAr ? "المحافظة:" : "Governorate:"}</label>
+                    <select
+                      value={selectedGovId}
+                      onChange={(e) => handleGovChange(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border outline-none focus:border-[#cca05a] cursor-pointer ${
+                        darkMode ? "bg-slate-950/60 border-white/5 text-slate-100" : "bg-white border-amber-950/15 text-slate-900"
+                      }`}
+                    >
+                      {EGYPT_GOVERNORATES.map((gov) => (
+                        <option key={gov.id} value={gov.id}>
+                          {isAr ? gov.nameAr : gov.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-slate-400 block font-bold">{isAr ? "المركز / المدينة:" : "Center / City:"}</label>
+                    <select
+                      value={selectedCenterId}
+                      onChange={(e) => setSelectedCenterId(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border outline-none focus:border-[#cca05a] cursor-pointer ${
+                        darkMode ? "bg-slate-950/60 border-white/5 text-slate-100" : "bg-white border-amber-950/15 text-slate-900"
+                      }`}
+                    >
+                      {activeGov.centers.map((center) => (
+                        <option key={center.id} value={center.id}>
+                          {isAr ? center.nameAr : center.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Show coordinates of selected center */}
+                {activeGov && (
+                  <div className="p-2 rounded-lg bg-slate-950/20 border border-white/5 text-[9px] text-slate-400 font-mono flex justify-between">
+                    <span>{isAr ? "خط الطول: " : "Lng: "}{activeGov.centers.find(c => c.id === selectedCenterId)?.lng || ""}</span>
+                    <span>{isAr ? "خط العرض: " : "Lat: "}{activeGov.centers.find(c => c.id === selectedCenterId)?.lat || ""}</span>
+                    <span className="text-[#cca05a] font-bold">{isAr ? "تنسيق فلكي دقيق" : "Astronomical precision"}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onApplyEgyptCenter}
+                  className="w-full py-2 px-4 text-xs font-extrabold rounded-xl bg-gradient-to-r from-amber-500 to-[#cca05a] text-slate-950 hover:shadow-lg transition duration-200 cursor-pointer"
+                >
+                  🇪🇬 {isAr ? "💾 حفظ وتطبيق مواقيت هذا المركز" : "💾 Save & Apply Center Times"}
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
+        ) : (
+          /* GPS is active - if the name shows Egypt governorate, display it as a nice badge */
+          gpsLocation.name && (gpsLocation.name.includes("مصر") || gpsLocation.name.includes("Egypt")) && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-right space-y-1.5" style={{ direction: "rtl" }}>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-amber-300 font-bold">🇪🇬 موقع مصر اليدوي مفعّل</span>
+                <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-500 text-slate-950 font-extrabold">{isAr ? "نشط" : "Active"}</span>
+              </div>
+              <p className="text-xs font-bold text-slate-100">{gpsLocation.name}</p>
+              <p className="text-[10px] text-slate-400">
+                {isAr 
+                  ? "تتم الحسابات للمركز المحدد بدقة متناهية وفق المذهب والزاوية المعتمدة."
+                  : "Calculations are active for the selected center using coordinates with maximum precision."}
+              </p>
+            </div>
+          )
         )}
 
         {/* 2. GPS Location Panel */}
