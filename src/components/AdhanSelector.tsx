@@ -142,6 +142,7 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
   }, [activeMuadhin]);
 
   useEffect(() => {
+    if (isNativeAndroid() && !activeMuadhin.id.startsWith("custom_")) return;
     if (!audioRef.current) return;
     if (isPlaying) {
       if (audioRef.current.paused) {
@@ -162,6 +163,11 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
         setIsPlaying(false);
         setLoadError("الوضع الصامت مفعّل. يرجى تعطيل الوضع الصامت في صفحة التنبيهات لتتمكن من تشغيل الأذان.");
       }
+      return;
+    }
+
+    if (isNativeAndroid() && !activeMuadhin.id.startsWith("custom_")) {
+      // Native android handles playback natively via MediaPlayer, bypasses HTML5 audio setup
       return;
     }
 
@@ -250,6 +256,27 @@ export default function AdhanSelector({ darkMode = true }: { darkMode?: boolean 
       return;
     }
     
+    // Android Native integration for bundled assets
+    if (isNativeAndroid() && !activeMuadhin.id.startsWith("custom_")) {
+      if (isPlaying) {
+        stopNativeEmbeddedAudio();
+        setIsPlaying(false);
+      } else {
+        setIsLoading(true);
+        setLoadError(null);
+        const filename = `${activeMuadhin.id}.mp3`;
+        const success = playNativeEmbeddedAudio(filename);
+        if (success) {
+          setIsPlaying(true);
+          setIsLoading(false);
+        } else {
+          setIsLoading(false);
+          setLoadError("فشل تشغيل الصوت محلياً على جهاز الأندرويد.");
+        }
+      }
+      return;
+    }
+
     // Toggle the HTML5 audio play state
     if (!audioRef.current) return;
 

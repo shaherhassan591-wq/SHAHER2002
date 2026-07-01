@@ -10,6 +10,8 @@ import {
   cancelAllNativeAlarms, 
   requestNativeAutostart, 
   requestNativeIgnoreBatteryOptimizations, 
+  playNativeEmbeddedAudio,
+  stopNativeEmbeddedAudio,
   APP_PACKAGE_ID 
 } from "../utils/androidBridge";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -1351,6 +1353,14 @@ export default function NotificationCenter() {
                   triggerLocalAlert("🔕 الوضع الصامت مفعّل", "لا يمكن تشغيل الصوت التجريبي أثناء تمكين 'الوضع الصامت'. يرجى إيقافه من الأعلى أولاً.", "prayer");
                   return;
                 }
+                
+                if (isNativeAndroid() && prophetChimesVoice !== "custom_voice") {
+                  const voiceFile = prophetChimesVoice === "prophet_voice_2" ? "prophet_voice_2.mp3" : "prophet_voice_1.mp3";
+                  playNativeEmbeddedAudio(voiceFile);
+                  triggerLocalAlert("💚 تجربة تذكير النبي", "اللهم صلّ وسلم وبارك على نبينا محمد وعلى آله وصحبه أجمعين.", "salat");
+                  return;
+                }
+
                 if (prophetChimesVoice === "custom_voice") {
                   import("../utils/audioStorage").then(({ getCustomAudio }) => {
                     getCustomAudio().then(blob => {

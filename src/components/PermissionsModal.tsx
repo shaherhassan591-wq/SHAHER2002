@@ -290,6 +290,12 @@ export default function PermissionsModal({ onComplete, darkMode }: PermissionsMo
                     <span>{isRequestingLocation ? "جاري تفعيل الإذن..." : "سماح بتحديد الموقع 📍"}</span>
                   </button>
                 )}
+
+                {locationStatus === "denied" && (
+                  <p className="mt-2 text-[10px] text-amber-500 leading-relaxed font-medium">
+                    ⚠️ تم رفض الإذن من المتصفح أو النظام. لا تقلق، يمكنك تخطي هذه الخطوة بالضغط على "حفظ الصلاحيات والدخول" في الأسفل، واختيار مدينتك يدوياً بسهولة في أي وقت من صفحة الإعدادات ⚙️.
+                  </p>
+                )}
               </div>
             </div>
           </div>

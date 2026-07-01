@@ -40,6 +40,9 @@ public class MainActivity extends BridgeActivity {
             webView.getSettings().setGeolocationEnabled(true);
             webView.getSettings().setGeolocationDatabasePath(getFilesDir().getPath());
             
+            // Allow auto-play of audio/video without requiring an initial user interaction/touch gesture
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+            
             // Ensure standard Geolocation requests inside WebView are automatically granted
             webView.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
                 @Override
