@@ -171,8 +171,8 @@ public class AlarmSoundService extends Service {
         mediaPlayer = new MediaPlayer();
 
         String resolvedVoiceId = voiceId;
-        if (voiceId.equals("prophet") || voiceId.equals("pre_reminder")) {
-            resolvedVoiceId = "real_prophet";
+        if (voiceId.equals("prophet") || voiceId.equals("pre_reminder") || voiceId.equals("real_prophet")) {
+            resolvedVoiceId = "prophet_voice_1";
         }
 
         // 2. Play from local storage if downloaded file exists
@@ -257,7 +257,7 @@ public class AlarmSoundService extends Service {
         } else if (voiceId.equals("prophet_voice_2")) {
             onlineUrl = "https://ais-pre-4njjxv7a6hjryet3spykcm-960490970057.europe-west2.run.app/audio/prophet_voice_2.mp3";
         } else if (voiceId.contains("prophet") || voiceId.equals("real_prophet") || voiceId.equals("pre_reminder")) {
-            onlineUrl = "https://archive.org/download/abhd1984520_gmail_20150511_1134/%D8%B5%D9%84%D9%88%D8%A7%20%D8%B9%D9%84%D9%8A%D9%87%20%D9%88%D8%B3%D9%84%D9%85%D9%88%D8%A7%20%D8%AA%D8%B3%D9%84%D9%8A%D9%85%D8%A7%20.%20%D8%A7%D9%84%D8%B9%D9%81%D8%A7%D8%B3%D9%8A.mp3";
+            onlineUrl = "https://ais-pre-4njjxv7a6hjryet3spykcm-960490970057.europe-west2.run.app/audio/prophet_voice_1.mp3";
         }
 
         if (onlineUrl != null) {

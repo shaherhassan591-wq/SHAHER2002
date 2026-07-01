@@ -11,7 +11,7 @@ interface PrayerSettingsTabProps {
   handleUpdateCity: (cityId: string) => void;
   CITIES: Array<{ id: string; nameAr: string; nameEn: string; lat: number; lng: number; timezone: number }>;
   METHODS: Array<{ id: string; nameAr: string; nameEn: string; fajrAngle: number; ishaAngle: number }>;
-  gpsLocation: { lat: number | null; lng: number | null; name: string };
+  gpsLocation: { lat: number | null; lng: number | null; name: string; timezone?: number };
   gpsLoading: boolean;
   gpsError: string | null;
   handleFetchGPS: () => void;
@@ -25,6 +25,7 @@ interface PrayerSettingsTabProps {
   manualPrayerTimes: Record<string, string>;
   handleToggleManualMode: (enabled: boolean) => void;
   handleUpdateManualPrayerTime: (key: string, value: string) => void;
+  handleSaveManualCoords?: (lat: number, lng: number, name: string, timezone: number) => void;
 }
 
 export const PrayerSettingsTab: React.FC<PrayerSettingsTabProps> = ({
@@ -49,8 +50,27 @@ export const PrayerSettingsTab: React.FC<PrayerSettingsTabProps> = ({
   manualPrayerTimesMode,
   manualPrayerTimes,
   handleToggleManualMode,
-  handleUpdateManualPrayerTime
+  handleUpdateManualPrayerTime,
+  handleSaveManualCoords
 }) => {
+  const [showManualInputs, setShowManualInputs] = React.useState(false);
+  const [manualLat, setManualLat] = React.useState(String(gpsLocation.lat || "24.7136"));
+  const [manualLng, setManualLng] = React.useState(String(gpsLocation.lng || "46.6753"));
+  const [manualTz, setManualTz] = React.useState(String(gpsLocation.timezone || "3"));
+  const [manualName, setManualName] = React.useState(gpsLocation.name || (isAr ? "موقعي اليدوي" : "My Manual Coordinates"));
+  const [manualSaveSuccess, setManualSaveSuccess] = React.useState(false);
+
+  const onSaveManual = () => {
+    const latNum = parseFloat(manualLat);
+    const lngNum = parseFloat(manualLng);
+    const tzNum = parseFloat(manualTz);
+    if (!isNaN(latNum) && !isNaN(lngNum) && !isNaN(tzNum) && handleSaveManualCoords) {
+      handleSaveManualCoords(latNum, lngNum, manualName, tzNum);
+      setManualSaveSuccess(true);
+      setTimeout(() => setManualSaveSuccess(false), 4000);
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -197,6 +217,87 @@ export const PrayerSettingsTab: React.FC<PrayerSettingsTabProps> = ({
               <p className="text-[10px] text-rose-400 font-bold mt-1 text-center">
                 ⚠️ {gpsError}
               </p>
+            )}
+
+            <div className="pt-2 border-t border-white/5 text-center">
+              <button
+                type="button"
+                onClick={() => setShowManualInputs(!showManualInputs)}
+                className="text-[11px] text-[#cca05a] hover:underline font-bold cursor-pointer"
+              >
+                {showManualInputs 
+                  ? (isAr ? "▲ إخفاء إدخال الإحداثيات اليدوي" : "▲ Hide Manual Coordinates Input")
+                  : (isAr ? "📝 أدخل إحداثيات موقعك يدوياً (خطوط العرض والطول والوقت)" : "📝 Enter location coordinates manually (Lat, Lng, Timezone)")
+                }
+              </button>
+            </div>
+
+            {showManualInputs && (
+              <div className="p-4 rounded-xl bg-slate-950/45 border border-white/5 space-y-3 mt-2 text-right">
+                <span className="text-[10px] text-[#cca05a] font-bold block">
+                  {isAr ? "إدخال إحداثيات مخصصة بالكامل:" : "Enter Custom Coordinates:"}
+                </span>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-slate-400 block">{isAr ? "خط العرض (Latitude):" : "Latitude:"}</label>
+                    <input
+                      type="text"
+                      value={manualLat}
+                      onChange={(e) => setManualLat(e.target.value)}
+                      placeholder="e.g. 24.7136"
+                      className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs font-mono font-bold text-center text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-slate-400 block">{isAr ? "خط الطول (Longitude):" : "Longitude:"}</label>
+                    <input
+                      type="text"
+                      value={manualLng}
+                      onChange={(e) => setManualLng(e.target.value)}
+                      placeholder="e.g. 46.6753"
+                      className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs font-mono font-bold text-center text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-slate-400 block">{isAr ? "المنطقة الزمنية (GMT/UTC):" : "Timezone (GMT/UTC):"}</label>
+                    <input
+                      type="text"
+                      value={manualTz}
+                      onChange={(e) => setManualTz(e.target.value)}
+                      placeholder="e.g. 3"
+                      className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs font-mono font-bold text-center text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-slate-400 block">{isAr ? "اسم الموقع/المدينة:" : "Location/City Name:"}</label>
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder={isAr ? "مثال: موقعي الخاص" : "e.g. My Custom Location"}
+                      className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-center text-white font-bold"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onSaveManual}
+                  className="w-full mt-2 py-2 px-4 text-[11px] font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition cursor-pointer"
+                >
+                  {isAr ? "💾 حفظ وتطبيق الإحداثيات اليدوية" : "💾 Save & Apply Manual Coordinates"}
+                </button>
+
+                {manualSaveSuccess && (
+                  <div className="p-2 rounded bg-emerald-500/20 border border-emerald-500/30 text-center text-emerald-400 text-[10px] font-bold">
+                    ✓ {isAr ? "تم حفظ وتطبيق الإحداثيات الجديدة لمواقيت الصلاة بنجاح!" : "New coordinates applied and prayer times calculated!"}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

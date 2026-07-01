@@ -46,10 +46,11 @@
         </service>
 
         <!-- Alarm Playback Sound Service -->
-        <service 
-            android:name=".AlarmSoundService" 
+        <service
+            android:name=".AlarmSoundService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="mediaPlayback"
+        />
     </application>
 
     <!-- Permissions -->

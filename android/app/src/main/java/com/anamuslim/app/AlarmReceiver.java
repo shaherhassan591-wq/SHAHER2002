@@ -15,7 +15,7 @@ import androidx.core.app.NotificationCompat;
 
 public class AlarmReceiver extends BroadcastReceiver {
     private static final String TAG = "AlarmReceiver";
-    private static final String CHANNEL_ID = "prayer-times-v4-channel";
+    private static final String CHANNEL_ID = "prayer-times-v5-silent-channel";
 
     @Override
     public void onReceive(Context context, Intent intent) {

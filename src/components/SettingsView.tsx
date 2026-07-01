@@ -85,16 +85,28 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
   const [adhanStatusMsg, setAdhanStatusMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if Prophet audio is cached
-    getAudioByKey("real_prophet_v3").then(async (blob) => {
-      const isCached = blob !== null;
+    // Check if Prophet audio files are cached
+    Promise.all([
+      getAudioByKey("prophet_voice_1_v1"),
+      getAudioByKey("prophet_voice_2_v1")
+    ]).then(async ([blob1, blob2]) => {
+      const isCached = blob1 !== null && blob2 !== null;
       setProphetCached(isCached);
-      if (isCached && isNativeAndroid() && !hasNativeAudioFile("adhan_real_prophet.mp3") && blob) {
+      
+      if (blob1 && isNativeAndroid() && !hasNativeAudioFile("adhan_prophet_voice_1.mp3")) {
         try {
-          const b64 = await blobToBase64(blob);
-          saveNativeAudioFile("adhan_real_prophet.mp3", b64);
+          const b64 = await blobToBase64(blob1);
+          saveNativeAudioFile("adhan_prophet_voice_1.mp3", b64);
         } catch (e) {
-          console.error("Auto-sync prophet voice failed", e);
+          console.error("Auto-sync prophet voice 1 failed", e);
+        }
+      }
+      if (blob2 && isNativeAndroid() && !hasNativeAudioFile("adhan_prophet_voice_2.mp3")) {
+        try {
+          const b64 = await blobToBase64(blob2);
+          saveNativeAudioFile("adhan_prophet_voice_2.mp3", b64);
+        } catch (e) {
+          console.error("Auto-sync prophet voice 2 failed", e);
         }
       }
     }).catch(() => setProphetCached(false));
@@ -124,34 +136,37 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
 
   const handleDownloadProphetVoice = async () => {
     setDownloadingProphet(true);
-    setProphetStatusMsg(isAr ? "جاري تحميل وتخزين صوت الصلاة على النبي أوفلاين..." : "Downloading Prophet audio offline...");
+    setProphetStatusMsg(isAr ? "جاري تحميل وتخزين أصوات الصلاة على النبي أوفلاين..." : "Downloading Prophet voices offline...");
     try {
-      const url = "/audio/real_prophet.mp3?v=3";
-      let blob: Blob;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Local file fetch error");
-        blob = await res.blob();
-      } catch (err) {
-        // Fail-safe to online if local fetch fails
-        const onlineUrl = "https://archive.org/download/nbeslo3leh/%D8%A7%D9%84%D9%86%D8%A8%D9%8A%20%D1%81%D9%84%D9%88%D8%A7%20%D8%B9%D9%84%D9%8A%D9%87.mp3";
-        const res = await fetch(onlineUrl);
-        blob = await res.blob();
-      }
-      await saveAudioByKey("real_prophet_v3", blob);
+      // 1. Download Voice 1
+      const url1 = "/audio/prophet_voice_1.mp3";
+      let blob1: Blob;
+      const res1 = await fetch(url1);
+      if (!res1.ok) throw new Error("Voice 1 fetch error");
+      blob1 = await res1.blob();
+      await saveAudioByKey("prophet_voice_1_v1", blob1);
       if (isNativeAndroid()) {
-        try {
-          const b64 = await blobToBase64(blob);
-          saveNativeAudioFile("adhan_real_prophet.mp3", b64);
-        } catch (err) {
-          console.error("Failed to save prophet voice natively", err);
-        }
+        const b64 = await blobToBase64(blob1);
+        saveNativeAudioFile("adhan_prophet_voice_1.mp3", b64);
       }
+
+      // 2. Download Voice 2
+      const url2 = "/audio/prophet_voice_2.mp3";
+      let blob2: Blob;
+      const res2 = await fetch(url2);
+      if (!res2.ok) throw new Error("Voice 2 fetch error");
+      blob2 = await res2.blob();
+      await saveAudioByKey("prophet_voice_2_v1", blob2);
+      if (isNativeAndroid()) {
+        const b64 = await blobToBase64(blob2);
+        saveNativeAudioFile("adhan_prophet_voice_2.mp3", b64);
+      }
+
       setProphetCached(true);
-      setProphetStatusMsg(isAr ? "تم التحميل والحفظ بنجاح! يعمل الصوت الآن بالكامل بدون إنترنت 🟢" : "Saved successfully! Audio works fully offline now 🟢");
+      setProphetStatusMsg(isAr ? "تم تحميل وحفظ الصوتين بنجاح! يعمل كلاهما الآن بالكامل بدون إنترنت 🟢" : "Both voices saved successfully! They now work fully offline 🟢");
     } catch (e) {
       console.error(e);
-      setProphetStatusMsg(isAr ? "حدث خطأ أثناء تحميل الملف. تحقق من اتصال الشبكة." : "Error downloading. Check network connection.");
+      setProphetStatusMsg(isAr ? "حدث خطأ أثناء تحميل الملفات. تحقق من اتصال الشبكة." : "Error downloading. Check network connection.");
     } finally {
       setDownloadingProphet(false);
     }
@@ -324,14 +339,27 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
   const [asrJuristic, setAsrJuristic] = useState<"shafi" | "hanafi">(() => {
     return (localStorage.getItem("prayer_asr_juristic") || "shafi") as "shafi" | "hanafi";
   });
-  const [gpsLocation, setGpsLocation] = useState<{ lat?: number; lng?: number; name?: string }>(() => {
+  const [gpsLocation, setGpsLocation] = useState<{ lat?: number; lng?: number; name?: string; timezone?: number }>(() => {
     const lat = localStorage.getItem("prayer_gps_lat");
     const lng = localStorage.getItem("prayer_gps_lng");
     const name = localStorage.getItem("prayer_gps_name") || "";
-    return lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng), name } : {};
+    const tzStr = localStorage.getItem("prayer_gps_timezone");
+    const timezone = tzStr ? parseFloat(tzStr) : (new Date().getTimezoneOffset() / -60);
+    return lat && lng ? { lat: parseFloat(lat), lng: parseFloat(lng), name, timezone } : {};
   });
   const [gpsLoading, setGpsLoading] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+
+  const handleSaveManualCoords = (lat: number, lng: number, name: string, timezone: number) => {
+    const nextLoc = { lat, lng, name, timezone };
+    setGpsLocation(nextLoc);
+    savePrayerCalcSettings({
+      gpsLat: lat,
+      gpsLng: lng,
+      gpsName: name,
+      gpsTimezone: timezone
+    });
+  };
 
   const handleUpdateCalcType = (type: string) => {
     const nextType = type as "city" | "gps";
@@ -676,6 +704,7 @@ export default function SettingsView({ darkMode, setDarkMode }: SettingsViewProp
               manualPrayerTimes={manualPrayerTimes}
               handleToggleManualMode={handleToggleManualMode}
               handleUpdateManualPrayerTime={handleUpdateManualPrayerTime}
+              handleSaveManualCoords={handleSaveManualCoords}
             />
           )}
 

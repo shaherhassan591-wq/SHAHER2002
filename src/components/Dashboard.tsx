@@ -87,7 +87,6 @@ const dailyVerses: DailyVerse[] = [
 ];
 
 const PROPHET_VOICES = [
-  { id: "real_prophet", nameAr: "النبي صلّوا عليه (العفاسي)", nameEn: "Sallou Alayh (Al-Afasy)", url: "/audio/real_prophet.mp3?v=3" },
   { id: "prophet_voice_1", nameAr: "الصلاة على النبي (زدج - الصوت الأول)", nameEn: "Sallou Alayh (Voice 1)", url: "/audio/prophet_voice_1.mp3" },
   { id: "prophet_voice_2", nameAr: "الصلاة على النبي (زدج - الصوت الثاني)", nameEn: "Sallou Alayh (Voice 2)", url: "/audio/prophet_voice_2.mp3" },
   { id: "custom_voice", nameAr: "📁 ملف صوتي مخصص...", nameEn: "📁 Custom audio file...", url: "" }
@@ -403,7 +402,9 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
   });
 
   const [prophetChimesVoice, setProphetChimesVoice] = useState<string>(() => {
-    return localStorage.getItem("prophet_chimes_voice") || "real_prophet";
+    const saved = localStorage.getItem("prophet_chimes_voice");
+    if (!saved || saved === "real_prophet") return "prophet_voice_1";
+    return saved;
   });
 
   const [customAudioName, setCustomAudioName] = useState<string>(() => {
@@ -605,7 +606,9 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
       if (savedCount !== null) setBlessingsCount(Number(savedCount));
 
       const savedVoice = localStorage.getItem("prophet_chimes_voice");
-      if (savedVoice !== null) setProphetChimesVoice(savedVoice || "real_prophet");
+      if (savedVoice !== null) {
+        setProphetChimesVoice((savedVoice === "real_prophet" || !savedVoice) ? "prophet_voice_1" : savedVoice);
+      }
 
       const savedName = localStorage.getItem("custom_audio_filename");
       setCustomAudioName(savedName || "");
@@ -1285,11 +1288,6 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
                           }`}
                         >
                           <span className="block text-[9px] truncate">{isAr ? v.nameAr : v.nameEn}</span>
-                          {v.id === "real_prophet" && (
-                            <span className="text-[7px] bg-red-600 text-red-100 px-1 rounded-full absolute -top-2 -right-1 border border-red-500/20">
-                              {isAr ? "مأثور" : "Noble"}
-                            </span>
-                          )}
                         </button>
                       );
                     })}
@@ -1324,8 +1322,8 @@ export default function Dashboard({ darkMode = true, setActiveTab }: { darkMode?
                                 await deleteCustomAudio();
                                 setCustomAudioName("");
                                 localStorage.removeItem("custom_audio_filename");
-                                setProphetChimesVoice("real_prophet");
-                                localStorage.setItem("prophet_chimes_voice", "real_prophet");
+                                setProphetChimesVoice("prophet_voice_1");
+                                localStorage.setItem("prophet_chimes_voice", "prophet_voice_1");
                                 notifyProphetChange();
                               }
                             }}

@@ -35,13 +35,17 @@ export async function autoCacheEssentialAudios(): Promise<void> {
         console.log("[AutoCache] Old v2 prophet voice detected. Deleting old key from IndexedDB...");
         await deleteAudioByKey("real_prophet_v2");
       }
+      const oldBlob3 = await getAudioByKey("real_prophet_v3");
+      if (oldBlob3) {
+        console.log("[AutoCache] Old v3 prophet voice detected. Deleting old key from IndexedDB...");
+        await deleteAudioByKey("real_prophet_v3");
+      }
     } catch (e) {
       console.warn("[AutoCache] Failed to delete old prophet cache keys", e);
     }
 
     // 1. Prophet Blessing audios pre-caching
     const prophetVoicesToCache = [
-      { key: "real_prophet_v3", url: "/audio/real_prophet.mp3?v=3", filename: "adhan_real_prophet.mp3", fallbackUrl: "https://archive.org/download/nbeslo3leh/%D8%A7%D9%84%D9%86%D8%A8%D9%8A%20%D1%81%D9%84%D9%88%D8%A7%20%D8%B9%D9%84%D9%8A%D9%87.mp3" },
       { key: "prophet_voice_1_v1", url: "/audio/prophet_voice_1.mp3", filename: "adhan_prophet_voice_1.mp3", fallbackUrl: "" },
       { key: "prophet_voice_2_v1", url: "/audio/prophet_voice_2.mp3", filename: "adhan_prophet_voice_2.mp3", fallbackUrl: "" }
     ];

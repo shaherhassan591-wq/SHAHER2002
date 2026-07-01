@@ -116,7 +116,9 @@ export default function NotificationCenter() {
     return Number(localStorage.getItem("prophet_chimes_timing_min") || "0"); // minute of the hour, default 00 (exact hour)
   });
   const [prophetChimesVoice, setProphetChimesVoice] = useState<string>(() => {
-    return localStorage.getItem("prophet_chimes_voice") || "real_prophet";
+    const saved = localStorage.getItem("prophet_chimes_voice");
+    if (!saved || saved === "real_prophet") return "prophet_voice_1";
+    return saved;
   });
 
   const [customAudioName, setCustomAudioName] = useState<string>(() => {
@@ -302,7 +304,8 @@ export default function NotificationCenter() {
       // 2. Sync Salat-ala-Nabi (Prophet blessings) alarms if enabled!
       const prophetEnabled = localStorage.getItem("prophet_chimes_enabled") !== "false";
       if (prophetEnabled && !isSilent) {
-        const voiceId = localStorage.getItem("prophet_chimes_voice") || "real_prophet";
+        let voiceId = localStorage.getItem("prophet_chimes_voice") || "prophet_voice_1";
+        if (voiceId === "real_prophet") voiceId = "prophet_voice_1";
         const mode = localStorage.getItem("prophet_reminder_mode") || "interval";
         const startHour = Number(localStorage.getItem("prophet_active_hours_start") || "8");
         const endHour = Number(localStorage.getItem("prophet_active_hours_end") || "22");
@@ -367,7 +370,9 @@ export default function NotificationCenter() {
   useEffect(() => {
     const handleProphetChange = () => {
       const savedVoice = localStorage.getItem("prophet_chimes_voice");
-      if (savedVoice !== null) setProphetChimesVoice(savedVoice || "real_prophet");
+      if (savedVoice !== null) {
+        setProphetChimesVoice((savedVoice === "real_prophet" || !savedVoice) ? "prophet_voice_1" : savedVoice);
+      }
       const savedName = localStorage.getItem("custom_audio_filename");
       setCustomAudioName(savedName || "");
     };
@@ -1233,7 +1238,6 @@ export default function NotificationCenter() {
               <label className="text-[10px] text-amber-200/70 font-bold block text-right">🎙️ اختر الصوت البشري للتذكير بالصلوات على النبي ﷺ:</label>
               <div className="grid grid-cols-2 md:grid-cols-2 gap-1.5" style={{ direction: "rtl" }}>
                 {[
-                  { id: "real_prophet", name: isAr ? "النبي صلّوا عليه (العفاسي)" : "Sallou Alayh (Al-Afasy)" },
                   { id: "prophet_voice_1", name: isAr ? "زدج - الصوت الأول" : "Zedge - Voice 1" },
                   { id: "prophet_voice_2", name: isAr ? "زدج - الصوت الثاني" : "Zedge - Voice 2" },
                   { id: "custom_voice", name: isAr ? "📁 مخصص..." : "📁 Custom..." }
@@ -1278,8 +1282,8 @@ export default function NotificationCenter() {
                             await deleteCustomAudio();
                             setCustomAudioName("");
                             localStorage.removeItem("custom_audio_filename");
-                            setProphetChimesVoice("real_prophet");
-                            localStorage.setItem("prophet_chimes_voice", "real_prophet");
+                            setProphetChimesVoice("prophet_voice_1");
+                            localStorage.setItem("prophet_chimes_voice", "prophet_voice_1");
                             window.dispatchEvent(new Event("prophet-reminder-changed"));
                           }
                         }}
@@ -1356,7 +1360,7 @@ export default function NotificationCenter() {
                         audioObj.volume = 0.8;
                         audioObj.play().catch(() => {});
                       } else {
-                        const audioObj = new Audio("/audio/real_prophet.mp3?v=3");
+                        const audioObj = new Audio("/audio/prophet_voice_1.mp3");
                         audioObj.volume = 0.8;
                         audioObj.play().catch(() => {});
                       }
@@ -1364,9 +1368,11 @@ export default function NotificationCenter() {
                   });
                   return;
                 }
-                const mp3 = "/audio/real_prophet.mp3?v=3"; // default / real_prophet
+                const isVoice2 = prophetChimesVoice === "prophet_voice_2";
+                const dbKey = isVoice2 ? "prophet_voice_2_v1" : "prophet_voice_1_v1";
+                const mp3 = isVoice2 ? "/audio/prophet_voice_2.mp3" : "/audio/prophet_voice_1.mp3";
                 import("../utils/audioStorage").then(({ getAudioByKey }) => {
-                  getAudioByKey("real_prophet_v3").then(blob => {
+                  getAudioByKey(dbKey).then(blob => {
                     if (blob) {
                       const objectUrl = URL.createObjectURL(blob);
                       const audioObj = new Audio(objectUrl);
