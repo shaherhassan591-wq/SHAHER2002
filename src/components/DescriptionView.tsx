@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
-const shaherAvatar = "/src/assets/images/shaher_avatar_1782931768093.jpg";
 
 interface DescriptionViewProps {
   darkMode: boolean;
@@ -168,13 +167,8 @@ export default function DescriptionView({ darkMode }: DescriptionViewProps) {
           <div className={`rounded-2xl border p-5 shadow-xl text-center space-y-4 ${
             darkMode ? "bg-gradient-to-br from-[#0a273c] to-[#051624] border-white/5" : "bg-white border-amber-200/50"
           }`}>
-            <div className="w-20 h-20 mx-auto rounded-full overflow-hidden border-2 border-[#cca05a] shadow-lg">
-              <img
-                src={shaherAvatar}
-                alt="Shaher Hassan"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
+            <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-amber-500/20 to-emerald-500/20 flex items-center justify-center border border-[#cca05a]/30">
+              <User className="w-10 h-10 text-amber-500" />
             </div>
 
             <div className="space-y-1">
